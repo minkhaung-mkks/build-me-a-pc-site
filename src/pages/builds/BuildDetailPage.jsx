@@ -149,13 +149,19 @@ export default function BuildDetailPage() {
     setComments(getComments(id));
   }, [user, id, newComment, createItem, getComments]);
 
-  const hasExistingRequest = build && user
-    ? queryItems('build_requests', r => r.build_id === build.id && r.user_id === user.id).length > 0
-    : false;
+  // Check if this build already has an active request (open or claimed)
+  const activeRequest = build
+    ? queryItems('build_requests', r => r.build_id === build.id && (r.status === 'open' || r.status === 'claimed'))[0]
+    : null;
+  const hasActiveRequest = !!activeRequest;
+  const isOwnRequest = activeRequest && user && activeRequest.user_id === user.id;
 
   const handleCreateRequest = useCallback((e) => {
     e.preventDefault();
     if (!user || !build) return;
+    // Double-check no active request exists (prevent race conditions)
+    const existingActive = queryItems('build_requests', r => r.build_id === build.id && (r.status === 'open' || r.status === 'claimed'));
+    if (existingActive.length > 0) return;
     createItem('build_requests', {
       build_id: build.id,
       user_id: user.id,
@@ -167,7 +173,7 @@ export default function BuildDetailPage() {
     });
     setRequestCreated(true);
     setShowRequestForm(false);
-  }, [user, build, requestBudget, requestPurpose, requestNotes, createItem]);
+  }, [user, build, requestBudget, requestPurpose, requestNotes, createItem, queryItems]);
 
   const handleSubmitReply = useCallback((e) => {
     e.preventDefault();
@@ -443,6 +449,28 @@ export default function BuildDetailPage() {
                                   <span className="comment__date">{timeAgo(reply.created_at)}</span>
                                 </div>
                                 <p className="comment__content">{reply.content}</p>
+                                {isAuthenticated && (
+                                  <button
+                                    className="comment__reply-btn"
+                                    onClick={() => setReplyTo(replyTo === reply.id ? null : reply.id)}
+                                  >
+                                    {replyTo === reply.id ? 'Cancel' : 'Reply'}
+                                  </button>
+                                )}
+                                {replyTo === reply.id && (
+                                  <form className="comment-form comment-form--reply" onSubmit={handleSubmitReply}>
+                                    <textarea
+                                      className="form__textarea"
+                                      placeholder="Write a reply..."
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                      rows={2}
+                                    />
+                                    <button type="submit" className="btn btn--primary btn--sm" disabled={!replyText.trim()}>
+                                      Post Reply
+                                    </button>
+                                  </form>
+                                )}
                               </div>
                             );
                           })}
@@ -523,7 +551,7 @@ export default function BuildDetailPage() {
                       Show in Showcase
                     </label>
                   )}
-                  {build.status === 'published' && !hasExistingRequest && !requestCreated && (
+                  {build.status === 'published' && !hasActiveRequest && !requestCreated && (
                     <button
                       className="btn btn--primary btn--block"
                       onClick={() => setShowRequestForm(!showRequestForm)}
@@ -534,8 +562,12 @@ export default function BuildDetailPage() {
                   {requestCreated && (
                     <div className="alert alert--success">Request posted!</div>
                   )}
-                  {hasExistingRequest && !requestCreated && (
-                    <p className="text--muted">You already have a request for this build.</p>
+                  {hasActiveRequest && !requestCreated && (
+                    <p className="text--muted">
+                      {isOwnRequest
+                        ? 'You already have an active request for this build.'
+                        : 'This build already has an active request.'}
+                    </p>
                   )}
                 </div>
               )}
