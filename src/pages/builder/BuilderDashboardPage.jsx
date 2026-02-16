@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { formatCurrency, formatDate } from '../../utils/helpers';
+import { formatCurrency, formatDate, formatRating } from '../../utils/helpers';
 
 export default function BuilderDashboardPage() {
   const { user } = useAuth();
-  const { getBuilds, getOffers, getBuilderProfile, getInquiries, getRequests, getUser, getItemById } = useData();
+  const { getBuilds, getOffers, getBuilderProfile, getInquiries } = useData();
 
   const [activeTab, setActiveTab] = useState('offers');
   const [offers, setOffers] = useState([]);
@@ -18,37 +18,39 @@ export default function BuilderDashboardPage() {
     showcaseCount: 0,
     completedBuilds: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!user) return;
 
-    const builderOffers = getOffers({ builder_id: user.id });
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOffers(builderOffers);
+    const load = async () => {
+      try {
+        const [builderOffers, showcase, builderInquiries, builderProfile] = await Promise.all([
+          getOffers({ builder_id: user.id }),
+          getBuilds({ user_id: user.id, build_type: 'showcase' }),
+          getInquiries({ builder_id: user.id }),
+          getBuilderProfile(user.id),
+        ]);
 
-    const showcase = getBuilds({ user_id: user.id, build_type: 'showcase' });
-    setShowcaseBuilds(showcase);
+        setOffers(builderOffers);
+        setShowcaseBuilds(showcase);
+        setInquiries(builderInquiries);
 
-    const builderInquiries = getInquiries({ builder_id: user.id });
-    setInquiries(builderInquiries);
-
-    const builderProfile = getBuilderProfile(user.id);
-
-    setStats({
-      totalOffers: builderOffers.length,
-      acceptedOffers: builderOffers.filter(o => o.status === 'accepted').length,
-      showcaseCount: showcase.length,
-      completedBuilds: builderProfile?.completed_builds || 0,
-    });
+        setStats({
+          totalOffers: builderOffers.length,
+          acceptedOffers: builderOffers.filter(o => o.status === 'accepted').length,
+          showcaseCount: showcase.length,
+          completedBuilds: builderProfile?.completed_builds || 0,
+        });
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [user, getOffers, getBuilds, getInquiries, getBuilderProfile]);
-
-  const getRequestTitle = (requestId) => {
-    const requests = getRequests({});
-    const request = requests.find(r => r.id === requestId);
-    if (!request) return 'Unknown Request';
-    const build = getItemById('builds', request.build_id);
-    return build ? build.title : 'Unknown Build';
-  };
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -67,6 +69,9 @@ export default function BuilderDashboardPage() {
       default: return 'badge badge--secondary';
     }
   };
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">
@@ -127,32 +132,29 @@ export default function BuilderDashboardPage() {
             </div>
           ) : (
             <div className="grid grid--2">
-              {offers.map((offer) => {
-                const title = getRequestTitle(offer.request_id);
-                return (
-                  <Link to={`/requests/${offer.request_id}`} key={offer.id} className="card card--hover">
-                    <div className="card__body">
-                      <h3 className="card__title">{title}</h3>
-                      <span className={getStatusBadgeClass(offer.status)}>
-                        {offer.status}
-                      </span>
-                      <div className="card__price">
-                        {offer.fee ? formatCurrency(offer.fee) : 'Free'}
-                      </div>
-                      {offer.message && (
-                        <p className="card__description">
-                          {offer.message.length > 120
-                            ? offer.message.slice(0, 120) + '...'
-                            : offer.message}
-                        </p>
-                      )}
-                      <div className="card__meta">
-                        <span className="card__date">{formatDate(offer.created_at)}</span>
-                      </div>
+              {offers.map((offer) => (
+                <Link to={`/requests/${offer.request_id}`} key={offer.id} className="card card--hover">
+                  <div className="card__body">
+                    <h3 className="card__title">{offer.request_title || 'Unknown Request'}</h3>
+                    <span className={getStatusBadgeClass(offer.status)}>
+                      {offer.status}
+                    </span>
+                    <div className="card__price">
+                      {offer.fee ? formatCurrency(offer.fee) : 'Free'}
                     </div>
-                  </Link>
-                );
-              })}
+                    {offer.message && (
+                      <p className="card__description">
+                        {offer.message.length > 120
+                          ? offer.message.slice(0, 120) + '...'
+                          : offer.message}
+                      </p>
+                    )}
+                    <div className="card__meta">
+                      <span className="card__date">{formatDate(offer.created_at)}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
@@ -185,7 +187,7 @@ export default function BuilderDashboardPage() {
                     </div>
                     <div className="card__stats">
                       <span className="card__stat" title="Rating">
-                        &#9733; {build.rating_avg ? build.rating_avg.toFixed(1) : '0.0'} ({build.rating_count || 0})
+                        &#9733; {formatRating(build.rating_avg)} ({build.rating_count || 0})
                       </span>
                     </div>
                     <div className="card__meta">
@@ -208,31 +210,27 @@ export default function BuilderDashboardPage() {
             </div>
           ) : (
             <div className="grid grid--2">
-              {inquiries.map((inquiry) => {
-                const inquiryUser = getUser(inquiry.user_id);
-                const build = getItemById('builds', inquiry.build_id);
-                return (
-                  <div key={inquiry.id} className="card">
-                    <div className="card__body">
-                      <h3 className="card__title">
-                        {build ? build.title : 'Unknown Build'}
-                      </h3>
-                      <p className="card__description">
-                        <strong>From:</strong> {inquiryUser ? inquiryUser.display_name : 'Unknown User'}
-                      </p>
-                      {inquiry.message && (
-                        <p className="card__description">{inquiry.message}</p>
-                      )}
-                      <span className={getStatusBadgeClass(inquiry.status)}>
-                        {inquiry.status}
-                      </span>
-                      <div className="card__meta">
-                        <span className="card__date">{formatDate(inquiry.created_at)}</span>
-                      </div>
+              {inquiries.map((inquiry) => (
+                <div key={inquiry.id} className="card">
+                  <div className="card__body">
+                    <h3 className="card__title">
+                      {inquiry.build_title || 'Unknown Build'}
+                    </h3>
+                    <p className="card__description">
+                      <strong>From:</strong> {inquiry.user_display_name || 'Unknown User'}
+                    </p>
+                    {inquiry.message && (
+                      <p className="card__description">{inquiry.message}</p>
+                    )}
+                    <span className={getStatusBadgeClass(inquiry.status)}>
+                      {inquiry.status}
+                    </span>
+                    <div className="card__meta">
+                      <span className="card__date">{formatDate(inquiry.created_at)}</span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>

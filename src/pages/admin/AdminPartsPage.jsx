@@ -11,21 +11,38 @@ export default function AdminPartsPage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [search, setSearch] = useState('');
   const [showActive, setShowActive] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const loadParts = () => {
-    setParts(getAllParts());
+  const loadData = async () => {
+    try {
+      const [partsData, catsData] = await Promise.all([
+        getAllParts(),
+        getCategories(),
+      ]);
+      setParts(partsData);
+      setCategories(catsData);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    setCategories(getCategories());
-    loadParts();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getAllParts, getCategories]);
+  }, []);
 
-  const handleDelete = (partId, partName) => {
+  const handleDelete = async (partId, partName) => {
     if (!window.confirm(`Are you sure you want to delete "${partName}"?`)) return;
-    removeItem('parts', partId);
-    loadParts();
+    try {
+      await removeItem('parts', partId);
+      const updatedParts = await getAllParts();
+      setParts(updatedParts);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const getCategoryName = (categoryId) => {
@@ -49,6 +66,9 @@ export default function AdminPartsPage() {
     }
     return true;
   });
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">

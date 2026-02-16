@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, formatRating } from '../../utils/helpers';
 
 const AVAILABILITY_BADGE = {
   available: 'badge--success',
@@ -10,18 +10,30 @@ const AVAILABILITY_BADGE = {
 };
 
 export default function ShowcasePage() {
-  const { getBuilds, getUser } = useData();
+  const { getBuilds } = useData();
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [allBuilds, setAllBuilds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const result = await getBuilds({ status: 'published', build_type: 'showcase' });
+        setAllBuilds(result);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [getBuilds]);
 
   const builds = useMemo(() => {
-    let results = getBuilds({ status: 'published', build_type: 'showcase' });
-
-    // Only show builds from builders/admins
-    results = results.filter(b => {
-      const creator = getUser(b.user_id);
-      return creator && (creator.role === 'builder' || creator.role === 'admin');
-    });
+    let results = [...allBuilds];
 
     // Filter by availability
     if (availabilityFilter !== 'all') {
@@ -39,7 +51,10 @@ export default function ShowcasePage() {
     }
 
     return results;
-  }, [getBuilds, getUser, availabilityFilter, search]);
+  }, [allBuilds, availabilityFilter, search]);
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">
@@ -76,53 +91,49 @@ export default function ShowcasePage() {
         </div>
       ) : (
         <div className="grid grid--3">
-          {builds.map((build) => {
-            const builder = getUser(build.user_id);
+          {builds.map((build) => (
+            <Link
+              to={`/showcase/${build.id}`}
+              key={build.id}
+              className="card card--hover"
+            >
+              <img
+                className="card__image"
+                src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+                alt="PC Build"
+              />
+              <div className="card__body">
+                <h3 className="card__title">{build.title}</h3>
 
-            return (
-              <Link
-                to={`/showcase/${build.id}`}
-                key={build.id}
-                className="card card--hover"
-              >
-                <img
-                  className="card__image"
-                  src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
-                  alt="PC Build"
-                />
-                <div className="card__body">
-                  <h3 className="card__title">{build.title}</h3>
+                {build.specs_summary && (
+                  <p className="card__description">{build.specs_summary}</p>
+                )}
 
-                  {build.specs_summary && (
-                    <p className="card__description">{build.specs_summary}</p>
-                  )}
-
-                  <div className="showcase-card__price" style={{ fontSize: '1.25rem', fontWeight: '700', margin: '0.5rem 0' }}>
-                    {formatCurrency(build.total_price || 0)}
-                  </div>
-
-                  <span className={`badge ${AVAILABILITY_BADGE[build.availability_status] || 'badge--secondary'}`}>
-                    {(build.availability_status || 'available').replace('_', ' ')}
-                  </span>
-
-                  <div className="card__meta" style={{ marginTop: '0.75rem' }}>
-                    <span className="card__creator">
-                      by {builder ? builder.display_name : 'Unknown Builder'}
-                    </span>
-                  </div>
-
-                  <div className="card__stats">
-                    <span className="card__stat" title="Rating">
-                      &#9733; {build.rating_avg ? build.rating_avg.toFixed(1) : '0.0'} ({build.rating_count || 0})
-                    </span>
-                    <span className="card__stat" title="Likes">
-                      &#9829; {build.like_count || 0}
-                    </span>
-                  </div>
+                <div className="showcase-card__price" style={{ fontSize: '1.25rem', fontWeight: '700', margin: '0.5rem 0' }}>
+                  {formatCurrency(build.total_price || 0)}
                 </div>
-              </Link>
-            );
-          })}
+
+                <span className={`badge ${AVAILABILITY_BADGE[build.availability_status] || 'badge--secondary'}`}>
+                  {(build.availability_status || 'available').replace('_', ' ')}
+                </span>
+
+                <div className="card__meta" style={{ marginTop: '0.75rem' }}>
+                  <span className="card__creator">
+                    by {build.user_display_name || 'Unknown Builder'}
+                  </span>
+                </div>
+
+                <div className="card__stats">
+                  <span className="card__stat" title="Rating">
+                    &#9733; {formatRating(build.rating_avg)} ({build.rating_count || 0})
+                  </span>
+                  <span className="card__stat" title="Likes">
+                    &#9829; {build.like_count || 0}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>

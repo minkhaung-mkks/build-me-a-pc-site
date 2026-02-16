@@ -1,15 +1,36 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../contexts/DataContext';
 import { formatCurrency } from '../utils/helpers';
 
 export default function HomePage() {
-  const { getBuilds, getUsers, getAllParts, getUser } = useData();
+  const { getBuilds, getStats } = useData();
 
-  const showcaseBuilds = getBuilds({ status: 'published', build_type: 'showcase' }).slice(0, 3);
+  const [showcaseBuilds, setShowcaseBuilds] = useState([]);
+  const [stats, setStats] = useState({ builds: 0, users: 0, parts: 0, requests: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const totalBuilds = getBuilds({}).length;
-  const totalUsers = getUsers().length;
-  const totalParts = getAllParts().length;
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [builds, platformStats] = await Promise.all([
+          getBuilds({ status: 'published', build_type: 'showcase' }),
+          getStats(),
+        ]);
+        setShowcaseBuilds(builds.slice(0, 3));
+        setStats(platformStats);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [getBuilds, getStats]);
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">
@@ -34,37 +55,34 @@ export default function HomePage() {
             <Link to="/showcase" className="section__link">View All</Link>
           </div>
           <div className="grid grid--3">
-            {showcaseBuilds.map((build) => {
-              const creator = getUser(build.user_id);
-              return (
-                <Link to={`/showcase/${build.id}`} key={build.id} className="card card--hover">
-                  <img
-                    className="card__image"
-                    src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
-                    alt="PC Build"
-                  />
-                  <div className="card__body">
-                    <h3 className="card__title">{build.title}</h3>
-                    {build.purpose && (
-                      <span className="badge badge--secondary">{build.purpose}</span>
-                    )}
-                    <p className="card__description">
-                      {build.description
-                        ? build.description.length > 100
-                          ? build.description.slice(0, 100) + '...'
-                          : build.description
-                        : 'No description provided.'}
-                    </p>
-                    <div className="card__price">{formatCurrency(build.total_price || 0)}</div>
-                    <div className="card__meta">
-                      <span className="card__creator">
-                        by {creator ? creator.display_name : 'Unknown'}
-                      </span>
-                    </div>
+            {showcaseBuilds.map((build) => (
+              <Link to={`/showcase/${build.id}`} key={build.id} className="card card--hover">
+                <img
+                  className="card__image"
+                  src="https://www.shutterstock.com/image-vector/gaming-pc-wireframe-drawing-line-600nw-2588972631.jpg"
+                  alt="PC Build"
+                />
+                <div className="card__body">
+                  <h3 className="card__title">{build.title}</h3>
+                  {build.purpose && (
+                    <span className="badge badge--secondary">{build.purpose}</span>
+                  )}
+                  <p className="card__description">
+                    {build.description
+                      ? build.description.length > 100
+                        ? build.description.slice(0, 100) + '...'
+                        : build.description
+                      : 'No description provided.'}
+                  </p>
+                  <div className="card__price">{formatCurrency(build.total_price || 0)}</div>
+                  <div className="card__meta">
+                    <span className="card__creator">
+                      by {build.user_display_name || 'Unknown'}
+                    </span>
                   </div>
-                </Link>
-              );
-            })}
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
       )}
@@ -74,15 +92,15 @@ export default function HomePage() {
         <h2>Platform Stats</h2>
         <div className="grid grid--3">
           <div className="stat-card">
-            <span className="stat-card__number">{totalBuilds}</span>
+            <span className="stat-card__number">{stats.builds}</span>
             <span className="stat-card__label">Total Builds</span>
           </div>
           <div className="stat-card">
-            <span className="stat-card__number">{totalUsers}</span>
+            <span className="stat-card__number">{stats.users}</span>
             <span className="stat-card__label">Total Users</span>
           </div>
           <div className="stat-card">
-            <span className="stat-card__number">{totalParts}</span>
+            <span className="stat-card__number">{stats.parts}</span>
             <span className="stat-card__label">Total Parts</span>
           </div>
         </div>

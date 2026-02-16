@@ -89,9 +89,21 @@ export default function AdminPartNewPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [specs, setSpecs] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setCategories(getCategories());
+    const load = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [getCategories]);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
@@ -139,24 +151,29 @@ export default function AdminPartNewPage() {
     return specifications;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
 
     const specifications = buildSpecifications();
 
-    createItem('parts', {
-      category_id: categoryId,
-      name,
-      brand,
-      model,
-      specifications,
-      price: parseFloat(price),
-      image_url: imageUrl || null,
-      is_active: isActive,
-      created_by: user.id,
-    });
+    try {
+      await createItem('parts', {
+        category_id: categoryId,
+        name,
+        brand,
+        model,
+        specifications,
+        price: parseFloat(price),
+        image_url: imageUrl || null,
+        is_active: isActive,
+        created_by: user.id,
+      });
 
-    navigate('/admin/parts');
+      navigate('/admin/parts');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const renderSpecField = (field) => {
@@ -230,11 +247,15 @@ export default function AdminPartNewPage() {
     );
   };
 
+  if (loading) return <div className="loading">Loading...</div>;
+
   return (
     <div className="page">
       <div className="page__header">
         <h1>Add New Part</h1>
       </div>
+
+      {error && <div className="alert alert--error">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">

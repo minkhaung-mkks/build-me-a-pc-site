@@ -14,7 +14,7 @@ export default function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -27,11 +27,15 @@ export default function LoginPage() {
       return;
     }
 
-    const result = login(email.trim(), password);
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError(result.error);
+    try {
+      const result = await login(email.trim(), password);
+      if (result.success) {
+        navigate('/');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
     }
   };
 

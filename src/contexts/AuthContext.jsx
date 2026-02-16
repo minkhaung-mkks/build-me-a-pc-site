@@ -1,60 +1,60 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { getCollection, setCollection, getCurrentUser, setCurrentUser } from '../utils/storage.js';
-import { generateId } from '../utils/helpers.js';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import api from '../api/axios.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => getCurrentUser());
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((email, password) => {
-    const users = getCollection('users');
-    const found = users.find(u => u.email === email && u.password_hash === password);
-    if (!found) return { success: false, error: 'Invalid email or password' };
-    if (found.is_banned) return { success: false, error: 'This account has been banned' };
-    setCurrentUser(found);
-    setUser(found);
-    return { success: true };
+  // On mount, check for existing token
+  useEffect(() => {
+    const token = localStorage.getItem('bb_token');
+    if (token) {
+      api.get('/auth/me')
+        .then(res => setUser(res.data.user))
+        .catch(() => localStorage.removeItem('bb_token'))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, []);
+
+  const login = useCallback(async (email, password) => {
+    try {
+      const { data } = await api.post('/auth/login', { email, password });
+      localStorage.setItem('bb_token', data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Login failed' };
+    }
   }, []);
 
   const logout = useCallback(() => {
-    setCurrentUser(null);
+    localStorage.removeItem('bb_token');
     setUser(null);
   }, []);
 
-  const register = useCallback((email, password, displayName) => {
-    const users = getCollection('users');
-    if (users.find(u => u.email === email)) {
-      return { success: false, error: 'Email already registered' };
+  const register = useCallback(async (email, password, displayName) => {
+    try {
+      const { data } = await api.post('/auth/register', { email, password, display_name: displayName });
+      localStorage.setItem('bb_token', data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Registration failed' };
     }
-    const now = new Date().toISOString();
-    const newUser = {
-      id: generateId(),
-      email,
-      password_hash: password,
-      display_name: displayName,
-      avatar_url: null,
-      bio: null,
-      role: 'user',
-      is_banned: false,
-      created_at: now,
-      updated_at: now,
-    };
-    users.push(newUser);
-    setCollection('users', users);
-    setCurrentUser(newUser);
-    setUser(newUser);
-    return { success: true };
   }, []);
 
-  const refreshUser = useCallback(() => {
-    const current = getCurrentUser();
-    if (!current) return;
-    const users = getCollection('users');
-    const fresh = users.find(u => u.id === current.id);
-    if (fresh) {
-      setCurrentUser(fresh);
-      setUser(fresh);
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      setUser(data.user);
+    } catch {
+      // token invalid
+      localStorage.removeItem('bb_token');
+      setUser(null);
     }
   }, []);
 
@@ -64,6 +64,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     isBuilder: user?.role === 'builder' || user?.role === 'admin',
     isAdmin: user?.role === 'admin',
+    loading,
     login,
     logout,
     register,

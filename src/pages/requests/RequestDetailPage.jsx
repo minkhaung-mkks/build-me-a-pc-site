@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, formatDate } from '../../utils/helpers';
+import { formatCurrency, formatDate, formatRating } from '../../utils/helpers';
 
 const STATUS_BADGE = {
   open: 'badge--success',
@@ -15,8 +15,8 @@ const STATUS_BADGE = {
 export default function RequestDetailPage() {
   const { id } = useParams();
   const {
-    getItemById, getOffers, getBuildParts, getUser,
-    createItem, editItem, acceptOffer, getBuilderProfile,
+    getItemById, getOffers, getBuildParts,
+    createItem, editItem, acceptOffer,
   } = useData();
   const { user, isAuthenticated, isBuilder } = useAuth();
 
@@ -24,7 +24,8 @@ export default function RequestDetailPage() {
   const [build, setBuild] = useState(null);
   const [parts, setParts] = useState([]);
   const [offers, setOffers] = useState([]);
-  const [poster, setPoster] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Offer form state
   const [offerFee, setOfferFee] = useState(0);
@@ -32,20 +33,46 @@ export default function RequestDetailPage() {
   const [offerContact, setOfferContact] = useState('');
   const [offerError, setOfferError] = useState('');
 
-  const loadData = () => {
-    const req = getItemById('build_requests', id);
-    if (!req) return;
-    setRequest(req);
-    setBuild(getItemById('builds', req.build_id));
-    setParts(getBuildParts(req.build_id));
-    setOffers(getOffers({ request_id: req.id }));
-    setPoster(getUser(req.user_id));
+  const loadData = async () => {
+    try {
+      const req = await getItemById('build_requests', id);
+      if (!req) {
+        setRequest(null);
+        return;
+      }
+      setRequest(req);
+
+      const [buildData, partsData, offersData] = await Promise.all([
+        getItemById('builds', req.build_id),
+        getBuildParts(req.build_id),
+        getOffers({ request_id: req.id }),
+      ]);
+
+      setBuild(buildData);
+      setParts(partsData);
+      setOffers(offersData);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   useEffect(() => {
-    loadData();
+    const load = async () => {
+      try {
+        setLoading(true);
+        await loadData();
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   if (!request) {
     return (
@@ -61,7 +88,7 @@ export default function RequestDetailPage() {
   const isOwner = isAuthenticated && user.id === request.user_id;
   const alreadyOffered = isBuilder && offers.some(o => o.builder_id === user?.id);
 
-  const handleSubmitOffer = (e) => {
+  const handleSubmitOffer = async (e) => {
     e.preventDefault();
     setOfferError('');
 
@@ -78,34 +105,50 @@ export default function RequestDetailPage() {
       return;
     }
 
-    createItem('builder_offers', {
-      request_id: request.id,
-      builder_id: user.id,
-      fee: Number(offerFee) || 0,
-      message: offerMessage.trim(),
-      contact_info: offerContact.trim(),
-      status: 'pending',
-    });
+    try {
+      await createItem('builder_offers', {
+        request_id: request.id,
+        builder_id: user.id,
+        fee: Number(offerFee) || 0,
+        message: offerMessage.trim(),
+        contact_info: offerContact.trim(),
+        status: 'pending',
+      });
 
-    setOfferFee(0);
-    setOfferMessage('');
-    setOfferContact('');
-    loadData();
+      setOfferFee(0);
+      setOfferMessage('');
+      setOfferContact('');
+      await loadData();
+    } catch (err) {
+      setOfferError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleAcceptOffer = (offerId) => {
-    acceptOffer(offerId, request.id);
-    loadData();
+  const handleAcceptOffer = async (offerId) => {
+    try {
+      await acceptOffer(offerId);
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleMarkComplete = () => {
-    editItem('build_requests', request.id, { status: 'completed' });
-    loadData();
+  const handleMarkComplete = async () => {
+    try {
+      await editItem('build_requests', request.id, { status: 'completed' });
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleCancel = () => {
-    editItem('build_requests', request.id, { status: 'cancelled' });
-    loadData();
+  const handleCancel = async () => {
+    try {
+      await editItem('build_requests', request.id, { status: 'cancelled' });
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   return (
@@ -121,7 +164,7 @@ export default function RequestDetailPage() {
             {build ? (
               <Link to={`/builds/${build.id}`}>{build.title}</Link>
             ) : (
-              'Untitled Build'
+              request.build_title || 'Untitled Build'
             )}
           </h1>
           <span className={`badge ${STATUS_BADGE[request.status] || 'badge--secondary'}`}>
@@ -142,21 +185,22 @@ export default function RequestDetailPage() {
             <p><strong>Notes:</strong> {request.notes}</p>
           )}
 
-          {request.preferred_builder_id && (() => {
-            const preferredBuilder = getUser(request.preferred_builder_id);
-            return preferredBuilder ? (
-              <p style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
-                Wished to be built by{' '}
-                <Link to={`/profile/${preferredBuilder.id}`}>{preferredBuilder.display_name}</Link>
-              </p>
-            ) : null;
-          })()}
+          {request.preferred_builder_name && (
+            <p style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
+              Wished to be built by{' '}
+              {request.preferred_builder_id ? (
+                <Link to={`/profile/${request.preferred_builder_id}`}>{request.preferred_builder_name}</Link>
+              ) : (
+                request.preferred_builder_name
+              )}
+            </p>
+          )}
 
           <div className="card__meta" style={{ marginTop: '1rem' }}>
             <span>
               Posted by{' '}
-              {poster ? (
-                <Link to={`/profile/${poster.id}`}>{poster.display_name}</Link>
+              {request.user_id ? (
+                <Link to={`/profile/${request.user_id}`}>{request.user_display_name || 'Unknown'}</Link>
               ) : (
                 'Unknown'
               )}
@@ -286,16 +330,16 @@ export default function RequestDetailPage() {
         ) : (
           <div className="offer-list">
             {offers.map((offer) => {
-              const builder = getUser(offer.builder_id);
-              const profile = getBuilderProfile(offer.builder_id);
               const isAccepted = offer.status === 'accepted';
 
               return (
                 <div key={offer.id} className="card offer-card" style={{ marginBottom: '1rem' }}>
                   <div className="card__header">
                     <h4>
-                      {builder ? (
-                        <Link to={`/profile/${builder.id}`}>{builder.display_name}</Link>
+                      {offer.builder_id ? (
+                        <Link to={`/profile/${offer.builder_id}`}>
+                          {offer.builder_display_name || 'Unknown Builder'}
+                        </Link>
                       ) : (
                         'Unknown Builder'
                       )}
@@ -321,16 +365,16 @@ export default function RequestDetailPage() {
 
                     <p>{offer.message}</p>
 
-                    {profile && (
+                    {offer.builder_profile && (
                       <div className="offer-card__stats" style={{ marginTop: '0.5rem', color: 'var(--color-text-muted)' }}>
-                        {profile.years_of_experience != null && (
-                          <span>{profile.years_of_experience} years experience</span>
+                        {offer.builder_profile.years_of_experience != null && (
+                          <span>{offer.builder_profile.years_of_experience} years experience</span>
                         )}
-                        {profile.completed_builds != null && (
-                          <span> &middot; {profile.completed_builds} builds completed</span>
+                        {offer.builder_profile.completed_builds != null && (
+                          <span> &middot; {offer.builder_profile.completed_builds} builds completed</span>
                         )}
-                        {profile.avg_rating != null && (
-                          <span> &middot; {profile.avg_rating.toFixed(1)} avg rating</span>
+                        {offer.builder_profile.avg_rating != null && (
+                          <span> &middot; {formatRating(offer.builder_profile.avg_rating)} avg rating</span>
                         )}
                       </div>
                     )}

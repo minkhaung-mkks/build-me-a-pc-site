@@ -2,12 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { checkCompatibility } from '../../utils/compatibility';
 import { formatCurrency } from '../../utils/helpers';
 
 export default function BuildEditPage() {
   const { user } = useAuth();
-  const { getCategories, getParts, saveBuild, getItemById, getBuildParts } =
+  const { getCategories, getParts, saveBuild, getItemById, getBuildParts, checkCompatibility } =
     useData();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -18,50 +17,61 @@ export default function BuildEditPage() {
   const [selectedParts, setSelectedParts] = useState({});
   const [categories, setCategories] = useState([]);
   const [partsByCategory, setPartsByCategory] = useState({});
+  const [compatibilityIssues, setCompatibilityIssues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // Load categories, parts, and existing build data on mount
   useEffect(() => {
-    const build = getItemById('builds', id);
+    const load = async () => {
+      try {
+        const build = await getItemById('builds', id);
 
-    if (!build) {
-      navigate('/builds', { replace: true });
-      return;
-    }
+        if (!build) {
+          navigate('/builds', { replace: true });
+          return;
+        }
 
-    // Only the build owner can edit
-    if (user?.id !== build.user_id) {
-      navigate(`/builds/${id}`, { replace: true });
-      return;
-    }
+        // Only the build owner can edit
+        if (user?.id !== build.user_id) {
+          navigate(`/builds/${id}`, { replace: true });
+          return;
+        }
 
-    // Populate form fields from existing build
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTitle(build.title || '');
-    setDescription(build.description || '');
-    setPurpose(build.purpose || '');
+        // Populate form fields from existing build
+        setTitle(build.title || '');
+        setDescription(build.description || '');
+        setPurpose(build.purpose || '');
 
-    // Load categories and parts
-    const cats = getCategories();
-    setCategories(cats);
+        // Load categories and parts
+        const cats = await getCategories();
+        setCategories(cats);
 
-    const partsMap = {};
-    cats.forEach((cat) => {
-      partsMap[cat.id] = getParts(cat.id);
-    });
-    setPartsByCategory(partsMap);
+        const partsMap = {};
+        await Promise.all(
+          cats.map(async (cat) => {
+            partsMap[cat.id] = await getParts(cat.id);
+          })
+        );
+        setPartsByCategory(partsMap);
 
-    // Load existing build parts and map them to category slugs
-    const existingBuildParts = getBuildParts(id);
-    const partsSelection = {};
-    existingBuildParts.forEach((bp) => {
-      if (bp.category) {
-        partsSelection[bp.category.slug] = bp.part_id;
+        // Load existing build parts and map them to category slugs
+        const existingBuildParts = await getBuildParts(id);
+        const partsSelection = {};
+        existingBuildParts.forEach((bp) => {
+          if (bp.category) {
+            partsSelection[bp.category.slug] = bp.part_id;
+          }
+        });
+        setSelectedParts(partsSelection);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
       }
-    });
-    setSelectedParts(partsSelection);
-
-    setLoading(false);
+    };
+    load();
   }, [id, user, navigate, getCategories, getParts, getItemById, getBuildParts]);
 
   // Build a map of category slug -> full part object for compatibility checking
@@ -78,10 +88,25 @@ export default function BuildEditPage() {
     return map;
   }, [selectedParts, categories, partsByCategory]);
 
-  // Run compatibility checks
-  const compatibilityIssues = useMemo(() => {
-    return checkCompatibility(selectedPartObjects);
-  }, [selectedPartObjects]);
+  // Run compatibility checks via API
+  useEffect(() => {
+    const keys = Object.keys(selectedPartObjects);
+    if (keys.length < 2) {
+      setCompatibilityIssues([]);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const issues = await checkCompatibility(selectedPartObjects);
+        if (!cancelled) setCompatibilityIssues(issues);
+      } catch {
+        if (!cancelled) setCompatibilityIssues([]);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [selectedPartObjects, checkCompatibility]);
 
   const hasErrors = compatibilityIssues.some((i) => i.severity === 'error');
 
@@ -100,31 +125,37 @@ export default function BuildEditPage() {
     }));
   };
 
-  const handleSave = (e, status) => {
+  const handleSave = async (e, status) => {
     e.preventDefault();
 
-    if (!title.trim()) return;
+    if (!title.trim() || saving) return;
+    setSaving(true);
 
-    const buildData = {
-      id,
-      user_id: user.id,
-      title: title.trim(),
-      description: description.trim(),
-      purpose: purpose.trim(),
-      total_price: totalPrice,
-      status,
-    };
+    try {
+      const buildData = {
+        id,
+        user_id: user.id,
+        title: title.trim(),
+        description: description.trim(),
+        purpose: purpose.trim(),
+        total_price: totalPrice,
+        status,
+      };
 
-    const build = saveBuild(buildData, selectedParts);
-    navigate(`/builds/${build.id}`);
+      const build = await saveBuild(buildData, selectedParts);
+      navigate(`/builds/${build.id}`);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+      setSaving(false);
+    }
   };
 
   if (loading) {
-    return (
-      <div className="page">
-        <p>Loading build...</p>
-      </div>
-    );
+    return <div className="loading">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="error-message">{error}</div>;
   }
 
   return (
@@ -257,17 +288,17 @@ export default function BuildEditPage() {
                 type="button"
                 className="btn btn--outline btn--block"
                 onClick={(e) => handleSave(e, 'draft')}
-                disabled={!title.trim()}
+                disabled={!title.trim() || saving}
               >
-                Save as Draft
+                {saving ? 'Saving...' : 'Save as Draft'}
               </button>
               <button
                 type="button"
                 className="btn btn--primary btn--block"
                 onClick={(e) => handleSave(e, 'published')}
-                disabled={!title.trim() || hasErrors}
+                disabled={!title.trim() || hasErrors || saving}
               >
-                Publish Build
+                {saving ? 'Publishing...' : 'Publish Build'}
               </button>
             </div>
           </div>

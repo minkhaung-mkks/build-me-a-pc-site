@@ -16,7 +16,7 @@ export default function RegisterPage() {
     return <Navigate to="/" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -41,11 +41,15 @@ export default function RegisterPage() {
       return;
     }
 
-    const result = register(email.trim(), password, displayName.trim());
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError(result.error);
+    try {
+      const result = await register(email.trim(), password, displayName.trim());
+      if (result.success) {
+        navigate('/');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
     }
   };
 

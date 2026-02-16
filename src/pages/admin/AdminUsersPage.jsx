@@ -4,41 +4,58 @@ import { useData } from '../../contexts/DataContext';
 import { formatDate } from '../../utils/helpers';
 
 export default function AdminUsersPage() {
-  const { getUsers, editItem } = useData();
+  const { getUsers, banUser, changeUserRole } = useData();
 
   const [users, setUsers] = useState([]);
   const [filterRole, setFilterRole] = useState('all');
   const [search, setSearch] = useState('');
   const [roleEdits, setRoleEdits] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const loadUsers = () => {
-    setUsers(getUsers());
+  const loadUsers = async () => {
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getUsers]);
+  }, []);
 
-  const handleBanToggle = (userId, currentBanned) => {
-    editItem('users', userId, { is_banned: !currentBanned });
-    loadUsers();
+  const handleBanToggle = async (userId, currentBanned) => {
+    try {
+      await banUser(userId, !currentBanned);
+      await loadUsers();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const handleRoleChange = (userId, newRole) => {
     setRoleEdits((prev) => ({ ...prev, [userId]: newRole }));
   };
 
-  const handleRoleSave = (userId) => {
+  const handleRoleSave = async (userId) => {
     const newRole = roleEdits[userId];
     if (!newRole) return;
-    editItem('users', userId, { role: newRole });
-    setRoleEdits((prev) => {
-      const copy = { ...prev };
-      delete copy[userId];
-      return copy;
-    });
-    loadUsers();
+    try {
+      await changeUserRole(userId, newRole);
+      setRoleEdits((prev) => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
+      await loadUsers();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -54,6 +71,9 @@ export default function AdminUsersPage() {
     }
     return true;
   });
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">

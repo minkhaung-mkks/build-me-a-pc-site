@@ -1,16 +1,30 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 
 export default function AdminDashboardPage() {
-  const { getUsers, getAll, getApplications } = useData();
+  const { getStats } = useData();
 
-  const stats = useMemo(() => ({
-    users: getUsers().length,
-    builds: getAll('builds').length,
-    parts: getAll('parts').length,
-    pendingApps: getApplications({ status: 'pending' }).length,
-  }), [getUsers, getAll, getApplications]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const result = await getStats();
+        setStats(result);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [getStats]);
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency, formatDate } from '../../utils/helpers';
+import { formatCurrency, formatDate, formatRating } from '../../utils/helpers';
 
 const AVAILABILITY_BADGE = {
   available: 'badge--success',
@@ -13,20 +13,21 @@ const AVAILABILITY_BADGE = {
 export default function ShowcaseDetailPage() {
   const { id } = useParams();
   const {
-    getItemById, getBuildParts, getUser, getBuilderProfile,
-    getRatings, getUserRating, addRating, getComments, createItem,
-    isLiked, toggleLike,
+    getItemById, getBuildParts, getBuilderProfile,
+    getRatings, getUserRating, addRating, getComments, addComment,
+    isLiked, toggleLike, createInquiry,
   } = useData();
   const { user, isAuthenticated } = useAuth();
 
   const [build, setBuild] = useState(null);
   const [parts, setParts] = useState([]);
-  const [builder, setBuilder] = useState(null);
   const [builderProfile, setBuilderProfile] = useState(null);
   const [ratings, setRatings] = useState([]);
   const [comments, setComments] = useState([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Inquiry form state
   const [inquiryMessage, setInquiryMessage] = useState('');
@@ -40,26 +41,61 @@ export default function ShowcaseDetailPage() {
   // Comment form state
   const [commentText, setCommentText] = useState('');
 
-  const loadData = () => {
-    const b = getItemById('builds', id);
-    if (!b) return;
-    setBuild(b);
-    setParts(getBuildParts(b.id));
-    setBuilder(getUser(b.user_id));
-    setBuilderProfile(getBuilderProfile(b.user_id));
-    setRatings(getRatings(b.id));
-    setComments(getComments(b.id));
-    setLikeCount(b.like_count || 0);
-    if (user) {
-      setLiked(isLiked(user.id, b.id));
-      setHasRated(!!getUserRating(user.id, b.id));
+  const loadData = async () => {
+    try {
+      const b = await getItemById('builds', id);
+      if (!b) {
+        setBuild(null);
+        return;
+      }
+      setBuild(b);
+      setLikeCount(b.like_count || 0);
+
+      const promises = [
+        getBuildParts(b.id),
+        getBuilderProfile(b.user_id),
+        getRatings(b.id),
+        getComments(b.id),
+      ];
+
+      if (user) {
+        promises.push(isLiked(b.id));
+        promises.push(getUserRating(b.id));
+      }
+
+      const results = await Promise.all(promises);
+
+      setParts(results[0]);
+      setBuilderProfile(results[1]);
+      setRatings(results[2]);
+      setComments(results[3]);
+
+      if (user) {
+        setLiked(results[4]);
+        setHasRated(!!results[5]);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
     }
   };
 
   useEffect(() => {
-    loadData();
+    const load = async () => {
+      try {
+        setLoading(true);
+        await loadData();
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   if (!build) {
     return (
@@ -74,53 +110,62 @@ export default function ShowcaseDetailPage() {
 
   const isOwner = isAuthenticated && user.id === build.user_id;
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!isAuthenticated) return;
-    const nowLiked = toggleLike(user.id, build.id);
-    setLiked(nowLiked);
-    setLikeCount(prev => nowLiked ? prev + 1 : Math.max(0, prev - 1));
+    try {
+      const nowLiked = await toggleLike(build.id);
+      setLiked(nowLiked);
+      setLikeCount(prev => nowLiked ? prev + 1 : Math.max(0, prev - 1));
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleSubmitRating = (e) => {
+  const handleSubmitRating = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || hasRated) return;
-    addRating({
-      build_id: build.id,
-      user_id: user.id,
-      score: Number(ratingScore),
-      review_text: ratingReview.trim() || null,
-    });
-    setRatingScore(5);
-    setRatingReview('');
-    setHasRated(true);
-    loadData();
+    try {
+      await addRating(build.id, {
+        score: Number(ratingScore),
+        review: ratingReview.trim() || null,
+      });
+      setRatingScore(5);
+      setRatingReview('');
+      setHasRated(true);
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleSubmitComment = (e) => {
+  const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || !commentText.trim()) return;
-    createItem('comments', {
-      build_id: build.id,
-      user_id: user.id,
-      content: commentText.trim(),
-      parent_comment_id: null,
-    });
-    setCommentText('');
-    loadData();
+    try {
+      await addComment(build.id, {
+        content: commentText.trim(),
+      });
+      setCommentText('');
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleSubmitInquiry = (e) => {
+  const handleSubmitInquiry = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || !inquiryMessage.trim()) return;
-    createItem('showcase_inquiries', {
-      build_id: build.id,
-      builder_id: build.user_id,
-      user_id: user.id,
-      message: inquiryMessage.trim(),
-      status: 'pending',
-    });
-    setInquiryMessage('');
-    setInquirySubmitted(true);
+    try {
+      await createInquiry({
+        build_id: build.id,
+        builder_id: build.user_id,
+        message: inquiryMessage.trim(),
+      });
+      setInquiryMessage('');
+      setInquirySubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   // Build threaded comment tree
@@ -172,7 +217,7 @@ export default function ShowcaseDetailPage() {
                   <span className="card__stat" title="Likes">&#9829; {likeCount}</span>
                 )}
                 <span className="card__stat" title="Rating">
-                  &#9733; {build.rating_avg ? build.rating_avg.toFixed(1) : '0.0'} ({build.rating_count || 0})
+                  &#9733; {formatRating(build.rating_avg)} ({build.rating_count || 0})
                 </span>
               </div>
 
@@ -299,29 +344,28 @@ export default function ShowcaseDetailPage() {
                 <p className="text--muted">No ratings yet. Be the first to rate this build.</p>
               ) : (
                 <div className="rating-list">
-                  {ratings.map((rating) => {
-                    const rater = getUser(rating.user_id);
-                    return (
-                      <div key={rating.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong>
-                            {rater ? (
-                              <Link to={`/profile/${rater.id}`}>{rater.display_name}</Link>
-                            ) : (
-                              'Unknown User'
-                            )}
-                          </strong>
-                          <span>
-                            {'★'.repeat(rating.score)}{'☆'.repeat(5 - rating.score)}
-                          </span>
-                        </div>
-                        {rating.review_text && <p style={{ marginTop: '0.25rem' }}>{rating.review_text}</p>}
-                        <span className="text--muted" style={{ fontSize: '0.85rem' }}>
-                          {formatDate(rating.created_at)}
+                  {ratings.map((rating) => (
+                    <div key={rating.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong>
+                          {rating.user_id ? (
+                            <Link to={`/profile/${rating.user_id}`}>
+                              {rating.user_display_name || 'Unknown User'}
+                            </Link>
+                          ) : (
+                            'Unknown User'
+                          )}
+                        </strong>
+                        <span>
+                          {'★'.repeat(rating.score)}{'☆'.repeat(5 - rating.score)}
                         </span>
                       </div>
-                    );
-                  })}
+                      {rating.review_text && <p style={{ marginTop: '0.25rem' }}>{rating.review_text}</p>}
+                      <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                        {formatDate(rating.created_at)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -355,14 +399,15 @@ export default function ShowcaseDetailPage() {
               ) : (
                 <div className="comment-list">
                   {topLevelComments.map((comment) => {
-                    const author = getUser(comment.user_id);
                     const replies = getReplies(comment.id);
                     return (
                       <div key={comment.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <strong>
-                            {author ? (
-                              <Link to={`/profile/${author.id}`}>{author.display_name}</Link>
+                            {comment.user_id ? (
+                              <Link to={`/profile/${comment.user_id}`}>
+                                {comment.user_display_name || 'Unknown User'}
+                              </Link>
                             ) : (
                               'Unknown User'
                             )}
@@ -376,26 +421,25 @@ export default function ShowcaseDetailPage() {
                         {/* Replies */}
                         {replies.length > 0 && (
                           <div style={{ marginLeft: '1.5rem', borderLeft: '2px solid var(--color-border, #ddd)', paddingLeft: '1rem' }}>
-                            {replies.map((reply) => {
-                              const replyAuthor = getUser(reply.user_id);
-                              return (
-                                <div key={reply.id} style={{ padding: '0.5rem 0' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <strong>
-                                      {replyAuthor ? (
-                                        <Link to={`/profile/${replyAuthor.id}`}>{replyAuthor.display_name}</Link>
-                                      ) : (
-                                        'Unknown User'
-                                      )}
-                                    </strong>
-                                    <span className="text--muted" style={{ fontSize: '0.85rem' }}>
-                                      {formatDate(reply.created_at)}
-                                    </span>
-                                  </div>
-                                  <p>{reply.content}</p>
+                            {replies.map((reply) => (
+                              <div key={reply.id} style={{ padding: '0.5rem 0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <strong>
+                                    {reply.user_id ? (
+                                      <Link to={`/profile/${reply.user_id}`}>
+                                        {reply.user_display_name || 'Unknown User'}
+                                      </Link>
+                                    ) : (
+                                      'Unknown User'
+                                    )}
+                                  </strong>
+                                  <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                                    {formatDate(reply.created_at)}
+                                  </span>
                                 </div>
-                              );
-                            })}
+                                <p>{reply.content}</p>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -414,10 +458,12 @@ export default function ShowcaseDetailPage() {
               <h3>Builder</h3>
             </div>
             <div className="card__body">
-              {builder ? (
+              {build.user_id ? (
                 <div>
                   <h4>
-                    <Link to={`/profile/${builder.id}`}>{builder.display_name}</Link>
+                    <Link to={`/profile/${build.user_id}`}>
+                      {build.user_display_name || 'Unknown Builder'}
+                    </Link>
                   </h4>
 
                   {builderProfile && (
@@ -431,7 +477,7 @@ export default function ShowcaseDetailPage() {
                       <div style={{ marginTop: '0.5rem' }}>
                         {builderProfile.avg_rating != null && (
                           <p>
-                            &#9733; {builderProfile.avg_rating.toFixed(1)} avg rating
+                            &#9733; {formatRating(builderProfile.avg_rating)} avg rating
                           </p>
                         )}
                         {builderProfile.completed_builds != null && (

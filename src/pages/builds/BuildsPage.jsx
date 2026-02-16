@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -9,10 +9,27 @@ export default function BuildsPage() {
   const { getBuilds } = useData();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
+  const [allBuilds, setAllBuilds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      try {
+        const results = await getBuilds({ user_id: user.id });
+        setAllBuilds(results);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [getBuilds, user]);
 
   const builds = useMemo(() => {
-    if (!user) return [];
-    let results = getBuilds({ user_id: user.id });
+    let results = [...allBuilds];
 
     // Filter by search query
     if (search.trim()) {
@@ -40,11 +57,14 @@ export default function BuildsPage() {
     }
 
     return results;
-  }, [getBuilds, user, search, sort]);
+  }, [allBuilds, search, sort]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">

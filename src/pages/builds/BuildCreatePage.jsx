@@ -2,12 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { checkCompatibility } from '../../utils/compatibility';
 import { formatCurrency } from '../../utils/helpers';
 
 export default function BuildCreatePage() {
   const { user } = useAuth();
-  const { getCategories, getParts, saveBuild, createItem } = useData();
+  const { getCategories, getParts, saveBuild, createItem, checkCompatibility } = useData();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isRequestMode = searchParams.get('request') === 'true';
@@ -22,18 +21,32 @@ export default function BuildCreatePage() {
   const [selectedParts, setSelectedParts] = useState({});
   const [categories, setCategories] = useState([]);
   const [partsByCategory, setPartsByCategory] = useState({});
+  const [compatibilityIssues, setCompatibilityIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // Load categories and parts on mount
   useEffect(() => {
-    const cats = getCategories();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCategories(cats);
+    const load = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
 
-    const partsMap = {};
-    cats.forEach((cat) => {
-      partsMap[cat.id] = getParts(cat.id);
-    });
-    setPartsByCategory(partsMap);
+        const partsMap = {};
+        await Promise.all(
+          cats.map(async (cat) => {
+            partsMap[cat.id] = await getParts(cat.id);
+          })
+        );
+        setPartsByCategory(partsMap);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [getCategories, getParts]);
 
   // Build a map of category slug -> full part object for compatibility checking
@@ -50,10 +63,26 @@ export default function BuildCreatePage() {
     return map;
   }, [selectedParts, categories, partsByCategory]);
 
-  // Run compatibility checks
-  const compatibilityIssues = useMemo(() => {
-    return checkCompatibility(selectedPartObjects);
-  }, [selectedPartObjects]);
+  // Run compatibility checks via API
+  useEffect(() => {
+    const keys = Object.keys(selectedPartObjects);
+    if (keys.length < 2) {
+      setCompatibilityIssues([]);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const issues = await checkCompatibility(selectedPartObjects);
+        if (!cancelled) setCompatibilityIssues(issues);
+      } catch {
+        // Silently ignore compat check failures — non-critical
+        if (!cancelled) setCompatibilityIssues([]);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [selectedPartObjects, checkCompatibility]);
 
   const hasErrors = compatibilityIssues.some((i) => i.severity === 'error');
 
@@ -72,44 +101,53 @@ export default function BuildCreatePage() {
     }));
   };
 
-  const handleSave = (e, status) => {
+  const handleSave = async (e, status) => {
     e.preventDefault();
 
-    if (!title.trim()) return;
+    if (!title.trim() || saving) return;
+    setSaving(true);
 
-    const buildData = {
-      user_id: user.id,
-      title: title.trim(),
-      description: description.trim(),
-      purpose: purpose.trim(),
-      total_price: totalPrice,
-      status,
-      build_type: 'personal',
-      availability_status: null,
-      image_urls: [],
-      specs_summary: null,
-      like_count: 0,
-      rating_avg: 0,
-      rating_count: 0,
-    };
-
-    const build = saveBuild(buildData, selectedParts);
-
-    if (isRequestMode) {
-      createItem('build_requests', {
-        build_id: build.id,
+    try {
+      const buildData = {
         user_id: user.id,
-        budget: Number(budget) || 0,
-        purpose: purpose.trim() || null,
-        notes: requestNotes.trim() || null,
-        preferred_builder_id: null,
-        status: 'open',
-      });
-      navigate('/requests');
-    } else {
-      navigate(`/builds/${build.id}`);
+        title: title.trim(),
+        description: description.trim(),
+        purpose: purpose.trim(),
+        total_price: totalPrice,
+        status,
+        build_type: 'personal',
+        availability_status: null,
+        image_urls: [],
+        specs_summary: null,
+        like_count: 0,
+        rating_avg: 0,
+        rating_count: 0,
+      };
+
+      const build = await saveBuild(buildData, selectedParts);
+
+      if (isRequestMode) {
+        await createItem('build_requests', {
+          build_id: build.id,
+          user_id: user.id,
+          budget: Number(budget) || 0,
+          purpose: purpose.trim() || null,
+          notes: requestNotes.trim() || null,
+          preferred_builder_id: null,
+          status: 'open',
+        });
+        navigate('/requests');
+      } else {
+        navigate(`/builds/${build.id}`);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+      setSaving(false);
     }
   };
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">
@@ -285,9 +323,9 @@ export default function BuildCreatePage() {
                   type="button"
                   className="btn btn--primary btn--block"
                   onClick={(e) => handleSave(e, 'published')}
-                  disabled={!title.trim() || hasErrors}
+                  disabled={!title.trim() || hasErrors || saving}
                 >
-                  Submit Request
+                  {saving ? 'Submitting...' : 'Submit Request'}
                 </button>
               ) : (
                 <>
@@ -295,17 +333,17 @@ export default function BuildCreatePage() {
                     type="button"
                     className="btn btn--outline btn--block"
                     onClick={(e) => handleSave(e, 'draft')}
-                    disabled={!title.trim()}
+                    disabled={!title.trim() || saving}
                   >
-                    Save as Draft
+                    {saving ? 'Saving...' : 'Save as Draft'}
                   </button>
                   <button
                     type="button"
                     className="btn btn--primary btn--block"
                     onClick={(e) => handleSave(e, 'published')}
-                    disabled={!title.trim() || hasErrors}
+                    disabled={!title.trim() || hasErrors || saving}
                   >
-                    Publish Build
+                    {saving ? 'Publishing...' : 'Publish Build'}
                   </button>
                 </>
               )}

@@ -5,7 +5,7 @@ import { useData } from '../../contexts/DataContext';
 
 export default function ProfileEditPage() {
   const { user, refreshUser, isBuilder } = useAuth();
-  const { editItem, getBuilderProfile } = useData();
+  const { updateUser, getBuilderProfile, updateBuilderProfile } = useData();
   const navigate = useNavigate();
 
   const [displayName, setDisplayName] = useState('');
@@ -19,32 +19,40 @@ export default function ProfileEditPage() {
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [address, setAddress] = useState('');
 
-  const [builderProfileId, setBuilderProfileId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (!user) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDisplayName(user.display_name || '');
-    setBio(user.bio || '');
-    setAvatarUrl(user.avatar_url || '');
+    const load = async () => {
+      try {
+        setDisplayName(user.display_name || '');
+        setBio(user.bio || '');
+        setAvatarUrl(user.avatar_url || '');
 
-    if (isBuilder) {
-      const profile = getBuilderProfile(user.id);
-      if (profile) {
-        setBuilderProfileId(profile.id);
-        setBusinessName(profile.business_name || '');
-        setSpecialization(profile.specialization || '');
-        setWebsite(profile.website || '');
-        setPortfolioUrl(profile.portfolio_url || '');
-        setAddress(profile.address || '');
+        if (isBuilder) {
+          const profile = await getBuilderProfile(user.id);
+          if (profile) {
+            setBusinessName(profile.business_name || '');
+            setSpecialization(profile.specialization || '');
+            setWebsite(profile.website || '');
+            setPortfolioUrl(profile.portfolio_url || '');
+            setAddress(profile.address || '');
+          }
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+    load();
   }, [user, isBuilder, getBuilderProfile]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -54,32 +62,35 @@ export default function ProfileEditPage() {
       return;
     }
 
-    editItem('users', user.id, {
-      display_name: displayName.trim(),
-      bio: bio.trim() || null,
-      avatar_url: avatarUrl.trim() || null,
-    });
-
-    if (isBuilder && builderProfileId) {
-      editItem('builder_profiles', builderProfileId, {
-        business_name: businessName.trim() || null,
-        specialization: specialization.trim() || null,
-        website: website.trim() || null,
-        portfolio_url: portfolioUrl.trim() || null,
-        address: address.trim() || null,
+    setSaving(true);
+    try {
+      await updateUser(user.id, {
+        display_name: displayName.trim(),
+        bio: bio.trim() || null,
+        avatar_url: avatarUrl.trim() || null,
       });
-    }
 
-    refreshUser();
-    navigate(`/profile/${user.id}`);
+      if (isBuilder) {
+        await updateBuilderProfile(user.id, {
+          business_name: businessName.trim() || null,
+          specialization: specialization.trim() || null,
+          website: website.trim() || null,
+          portfolio_url: portfolioUrl.trim() || null,
+          address: address.trim() || null,
+        });
+      }
+
+      await refreshUser();
+      navigate(`/profile/${user.id}`);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!user) {
-    return (
-      <div className="page">
-        <p>Loading...</p>
-      </div>
-    );
+  if (!user || loading) {
+    return <div className="loading">Loading...</div>;
   }
 
   return (
@@ -195,8 +206,8 @@ export default function ProfileEditPage() {
             </>
           )}
 
-          <button type="submit" className="btn btn--primary btn--block">
-            Save Changes
+          <button type="submit" className="btn btn--primary btn--block" disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
       </div>

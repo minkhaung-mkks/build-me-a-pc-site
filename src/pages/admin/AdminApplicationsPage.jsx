@@ -1,84 +1,61 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/helpers';
 
 export default function AdminApplicationsPage() {
-  const { getApplications, editItem, createItem, getUser } = useData();
-  const { user: adminUser } = useAuth();
+  const { getApplications, reviewApplication } = useData();
 
   const [tab, setTab] = useState('pending');
+  const [applications, setApplications] = useState([]);
   const [adminNotes, setAdminNotes] = useState({});
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const applications = useMemo(
-    () => getApplications({ status: tab }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tab, getApplications, refreshKey]
-  );
-
-  const loadApplications = () => {
-    setRefreshKey((k) => k + 1);
+  const loadApplications = async () => {
+    try {
+      const data = await getApplications({ status: tab });
+      setApplications(data);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    setLoading(true);
+    loadApplications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   const handleNotesChange = (appId, value) => {
     setAdminNotes((prev) => ({ ...prev, [appId]: value }));
   };
 
-  const handleApprove = (app) => {
+  const handleApprove = async (app) => {
     const notes = adminNotes[app.id] || '';
-    const now = new Date().toISOString();
-
-    // 1. Update the application status
-    editItem('builder_apps', app.id, {
-      status: 'approved',
-      reviewed_by: adminUser.id,
-      reviewed_at: now,
-      admin_notes: notes,
-    });
-
-    // 2. Promote user to builder role
-    editItem('users', app.user_id, { role: 'builder' });
-
-    // 3. Create builder profile
-    createItem('builder_profiles', {
-      user_id: app.user_id,
-      business_name: app.business_name,
-      registration_number: app.registration_number,
-      address: app.address,
-      website: app.website,
-      portfolio_url: app.portfolio_url,
-      years_of_experience: app.years_of_experience,
-      specialization: app.specialization,
-      avg_rating: 0,
-      avg_response_time_hrs: null,
-      completed_builds: 0,
-      is_verified: true,
-    });
-
-    loadApplications();
+    try {
+      await reviewApplication(app.id, 'approved', notes);
+      await loadApplications();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
-  const handleReject = (app) => {
+  const handleReject = async (app) => {
     const notes = adminNotes[app.id] || '';
-    const now = new Date().toISOString();
-
-    editItem('builder_apps', app.id, {
-      status: 'rejected',
-      reviewed_by: adminUser.id,
-      reviewed_at: now,
-      admin_notes: notes,
-    });
-
-    loadApplications();
-  };
-
-  const getApplicantName = (userId) => {
-    const u = getUser(userId);
-    return u ? u.display_name : 'Unknown User';
+    try {
+      await reviewApplication(app.id, 'rejected', notes);
+      await loadApplications();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const tabs = ['pending', 'approved', 'rejected'];
+
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error-message">{error}</div>;
 
   return (
     <div className="page">
@@ -108,7 +85,7 @@ export default function AdminApplicationsPage() {
             <div key={app.id} className="card">
               <div className="card__body">
                 <h3 className="card__title">
-                  {getApplicantName(app.user_id)}
+                  {app.user_display_name || 'Unknown User'}
                 </h3>
                 <span className="badge badge--secondary">
                   {app.application_type || 'N/A'}

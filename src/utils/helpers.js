@@ -27,6 +27,11 @@ export function formatDateTime(dateString) {
   });
 }
 
+export function formatRating(value, fallback = '0.0') {
+  const num = Number(value);
+  return isNaN(num) || value == null ? fallback : num.toFixed(1);
+}
+
 export function timeAgo(dateString) {
   const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
   const intervals = [

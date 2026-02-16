@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { formatDate, formatCurrency } from '../../utils/helpers';
+import { formatDate, formatCurrency, formatRating } from '../../utils/helpers';
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -13,31 +13,38 @@ export default function ProfilePage() {
   const [builderProfile, setBuilderProfile] = useState(null);
   const [builds, setBuilds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const foundUser = getUser(id);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProfileUser(foundUser);
+    const load = async () => {
+      try {
+        const foundUser = await getUser(id);
+        setProfileUser(foundUser);
 
-    if (foundUser) {
-      const userBuilds = getBuilds({ user_id: foundUser.id, status: 'published' });
-      setBuilds(userBuilds);
+        if (foundUser) {
+          const userBuilds = await getBuilds({ user_id: foundUser.id, status: 'published' });
+          setBuilds(userBuilds);
 
-      if (foundUser.role === 'builder' || foundUser.role === 'admin') {
-        const bp = getBuilderProfile(foundUser.id);
-        setBuilderProfile(bp);
+          if (foundUser.role === 'builder' || foundUser.role === 'admin') {
+            const bp = await getBuilderProfile(foundUser.id);
+            setBuilderProfile(bp);
+          }
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
       }
-    }
-
-    setLoading(false);
+    };
+    load();
   }, [id, getUser, getBuilds, getBuilderProfile]);
 
   if (loading) {
-    return (
-      <div className="page">
-        <p>Loading...</p>
-      </div>
-    );
+    return <div className="loading">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="error-message">{error}</div>;
   }
 
   if (!profileUser) {
@@ -118,7 +125,7 @@ export default function ProfilePage() {
               <div>
                 <p>
                   <strong>Avg Rating:</strong>{' '}
-                  &#9733; {builderProfile.avg_rating ? builderProfile.avg_rating.toFixed(1) : 'N/A'}
+                  &#9733; {builderProfile.avg_rating != null ? formatRating(builderProfile.avg_rating) : 'N/A'}
                 </p>
                 <p>
                   <strong>Completed Builds:</strong>{' '}
@@ -192,7 +199,7 @@ export default function ProfilePage() {
                       &#9829; {build.like_count || 0}
                     </span>
                     <span className="card__stat" title="Rating">
-                      &#9733; {build.rating_avg ? build.rating_avg.toFixed(1) : '0.0'} ({build.rating_count || 0})
+                      &#9733; {formatRating(build.rating_avg)} ({build.rating_count || 0})
                     </span>
                   </div>
                   <div className="card__price">{formatCurrency(build.total_price || 0)}</div>

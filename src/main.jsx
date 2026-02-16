@@ -3,11 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
-import { initializeSeedData } from './utils/seed';
 import App from './App.jsx';
 import './index.css';
-
-initializeSeedData();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -5,13 +5,14 @@ import { useData } from '../../contexts/DataContext';
 
 export default function BuilderApplyPage() {
   const { user, isAuthenticated, isBuilder } = useAuth();
-  const { createItem, getApplications } = useData();
+  const { createItem, getMyApplications } = useData();
   const navigate = useNavigate();
 
   const [hasPending, setHasPending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [businessName, setBusinessName] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
@@ -22,15 +23,22 @@ export default function BuilderApplyPage() {
   const [specialization, setSpecialization] = useState('');
 
   useEffect(() => {
-    if (user) {
-      const pending = getApplications({ user_id: user.id, status: 'pending' });
-      if (pending.length > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setHasPending(true);
+    if (!user) return;
+
+    const load = async () => {
+      try {
+        const pending = await getMyApplications();
+        if (pending.some((app) => app.status === 'pending')) {
+          setHasPending(true);
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
-  }, [user, getApplications]);
+    };
+    load();
+  }, [user, getMyApplications]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -41,11 +49,7 @@ export default function BuilderApplyPage() {
   }
 
   if (loading) {
-    return (
-      <div className="page">
-        <p>Loading...</p>
-      </div>
-    );
+    return <div className="loading">Loading...</div>;
   }
 
   if (hasPending) {
@@ -80,7 +84,7 @@ export default function BuilderApplyPage() {
     );
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -89,23 +93,30 @@ export default function BuilderApplyPage() {
       return;
     }
 
-    createItem('builder_apps', {
-      user_id: user.id,
-      business_name: businessName.trim(),
-      registration_number: registrationNumber.trim() || null,
-      address: address.trim() || null,
-      website: website.trim() || null,
-      portfolio_url: portfolioUrl.trim() || null,
-      years_of_experience: yearsOfExperience ? parseInt(yearsOfExperience, 10) : null,
-      specialization: specialization.trim() || null,
-      application_type: 'business',
-      status: 'pending',
-      admin_notes: null,
-      reviewed_by: null,
-      reviewed_at: null,
-    });
+    setSubmitting(true);
+    try {
+      await createItem('builder_apps', {
+        user_id: user.id,
+        business_name: businessName.trim(),
+        registration_number: registrationNumber.trim() || null,
+        address: address.trim() || null,
+        website: website.trim() || null,
+        portfolio_url: portfolioUrl.trim() || null,
+        years_of_experience: yearsOfExperience ? parseInt(yearsOfExperience, 10) : null,
+        specialization: specialization.trim() || null,
+        application_type: 'business',
+        status: 'pending',
+        admin_notes: null,
+        reviewed_by: null,
+        reviewed_at: null,
+      });
 
-    setSubmitted(true);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -208,8 +219,8 @@ export default function BuilderApplyPage() {
             />
           </div>
 
-          <button type="submit" className="btn btn--primary btn--block">
-            Submit Application
+          <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+            {submitting ? 'Submitting...' : 'Submit Application'}
           </button>
         </form>
       </div>

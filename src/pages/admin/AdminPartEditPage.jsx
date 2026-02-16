@@ -88,43 +88,52 @@ export default function AdminPartEditPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [specs, setSpecs] = useState({});
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const cats = getCategories();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCategories(cats);
+    const load = async () => {
+      try {
+        const [cats, part] = await Promise.all([
+          getCategories(),
+          getItemById('parts', id),
+        ]);
+        setCategories(cats);
 
-    const part = getItemById('parts', id);
-    if (part) {
-      setCategoryId(part.category_id);
-      setName(part.name);
-      setBrand(part.brand);
-      setModel(part.model);
-      setPrice(String(part.price));
-      setImageUrl(part.image_url || '');
-      setIsActive(part.is_active);
+        if (part) {
+          setCategoryId(part.category_id);
+          setName(part.name);
+          setBrand(part.brand);
+          setModel(part.model);
+          setPrice(String(part.price));
+          setImageUrl(part.image_url || '');
+          setIsActive(part.is_active);
 
-      // Load existing specifications into the specs state
-      if (part.specifications) {
-        const existingSpecs = {};
-        const cat = cats.find((c) => c.id === part.category_id);
-        const slug = cat ? cat.slug : '';
-        const fields = SPEC_FIELDS[slug] || [];
+          // Load existing specifications into the specs state
+          if (part.specifications) {
+            const existingSpecs = {};
+            const cat = cats.find((c) => c.id === part.category_id);
+            const slug = cat ? cat.slug : '';
+            const fields = SPEC_FIELDS[slug] || [];
 
-        for (const field of fields) {
-          const val = part.specifications[field.key];
-          if (field.isArray && Array.isArray(val)) {
-            existingSpecs[field.key] = val.join(', ');
-          } else if (val !== null && val !== undefined) {
-            existingSpecs[field.key] = val;
+            for (const field of fields) {
+              const val = part.specifications[field.key];
+              if (field.isArray && Array.isArray(val)) {
+                existingSpecs[field.key] = val.join(', ');
+              } else if (val !== null && val !== undefined) {
+                existingSpecs[field.key] = val;
+              }
+            }
+            setSpecs(existingSpecs);
           }
         }
-        setSpecs(existingSpecs);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message);
+      } finally {
+        setLoading(false);
       }
-
-      setLoaded(true);
-    }
+    };
+    load();
   }, [id, getCategories, getItemById]);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
@@ -171,23 +180,28 @@ export default function AdminPartEditPage() {
     return specifications;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
 
     const specifications = buildSpecifications();
 
-    editItem('parts', id, {
-      category_id: categoryId,
-      name,
-      brand,
-      model,
-      specifications,
-      price: parseFloat(price),
-      image_url: imageUrl || null,
-      is_active: isActive,
-    });
+    try {
+      await editItem('parts', id, {
+        category_id: categoryId,
+        name,
+        brand,
+        model,
+        specifications,
+        price: parseFloat(price),
+        image_url: imageUrl || null,
+        is_active: isActive,
+      });
 
-    navigate('/admin/parts');
+      navigate('/admin/parts');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    }
   };
 
   const renderSpecField = (field) => {
@@ -260,12 +274,16 @@ export default function AdminPartEditPage() {
     );
   };
 
-  if (!loaded) {
+  if (loading) {
     return (
       <div className="page">
-        <p>Loading part...</p>
+        <div className="loading">Loading...</div>
       </div>
     );
+  }
+
+  if (error && !categories.length) {
+    return <div className="error-message">{error}</div>;
   }
 
   return (
@@ -273,6 +291,8 @@ export default function AdminPartEditPage() {
       <div className="page__header">
         <h1>Edit Part</h1>
       </div>
+
+      {error && <div className="alert alert--error">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">
