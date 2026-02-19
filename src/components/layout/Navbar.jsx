@@ -24,7 +24,12 @@ export default function Navbar() {
               <Link to="/builds/new">Create Build</Link>
               {!isBuilder && <Link to="/builder/apply">Become a Builder</Link>}
               {isBuilder && <Link to="/builder/dashboard">Builder Dashboard</Link>}
-              {isAdmin && <Link to="/admin/dashboard">Admin</Link>}
+              {isAdmin && (
+                <>
+                  <Link to="/admin/dashboard">Admin</Link>
+                  {/* <Link to="/admin/rules">Rules</Link> */}
+                </>
+              )}
               <div className="navbar__user">
                 <Link to={`/profile/${user.id}`}>{user.display_name}</Link>
                 <button onClick={handleLogout} className="btn btn--sm btn--outline">Logout</button>

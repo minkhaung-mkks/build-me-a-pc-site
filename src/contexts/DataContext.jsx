@@ -271,6 +271,16 @@ export function DataProvider({ children }) {
     return data.issues;
   }, []);
 
+  const getCompatibilityRules = useCallback(async () => {
+    const { data } = await api.get('/compatibility/rules');
+    return data;
+  }, []);
+
+  const updateCompatibilityRule = useCallback(async (ruleId, updates) => {
+    const { data } = await api.put(`/compatibility/rules/${ruleId}`, updates);
+    return data;
+  }, []);
+
   // ─── Stats (public) ───────────────────────────────────────
   const getStats = useCallback(async () => {
     const { data } = await api.get('/stats');
@@ -297,6 +307,8 @@ export function DataProvider({ children }) {
     getInquiries, createInquiry, getApplications, getMyApplications, reviewApplication,
     // Compatibility
     checkCompatibility,
+    getCompatibilityRules,
+    updateCompatibilityRule,
     // Stats
     getStats,
   };

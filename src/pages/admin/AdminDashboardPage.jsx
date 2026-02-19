@@ -74,6 +74,12 @@ export default function AdminDashboardPage() {
             <p className="card__description">Review pending builder applications.</p>
           </div>
         </Link>
+        <Link to="/admin/rules" className="card card--hover">
+          <div className="card__body">
+            <h3 className="card__title">Compatibility Rules</h3>
+            <p className="card__description">Configure PC part compatibility validation rules.</p>
+          </div>
+        </Link>
       </div>
     </div>
   );

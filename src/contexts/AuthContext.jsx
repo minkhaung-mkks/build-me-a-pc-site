@@ -22,7 +22,9 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     try {
+      console.log("logging")
       const { data } = await api.post('/auth/login', { email, password });
+      console.log(data)
       localStorage.setItem('bb_token', data.token);
       setUser(data.user);
       return { success: true };

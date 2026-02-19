@@ -24,6 +24,7 @@ import AdminPartNewPage from './pages/admin/AdminPartNewPage';
 import AdminPartEditPage from './pages/admin/AdminPartEditPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminApplicationsPage from './pages/admin/AdminApplicationsPage';
+import AdminRulesPage from './pages/admin/AdminRulesPage';
 
 import './App.css';
 
@@ -80,6 +81,9 @@ export default function App() {
         } />
         <Route path="/admin/applications" element={
           <ProtectedRoute requiredRole="admin"><AdminApplicationsPage /></ProtectedRoute>
+        } />
+        <Route path="/admin/rules" element={
+          <ProtectedRoute requiredRole="admin"><AdminRulesPage /></ProtectedRoute>
         } />
       </Route>
     </Routes>
