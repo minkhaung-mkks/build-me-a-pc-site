@@ -1,56 +1,56 @@
-# Build Me a PC — Backend API
+# Build Me a PC — Frontend
 
-A RESTful backend API for **Build Me a PC**, a platform connecting PC enthusiasts with verified builders. The platform features a logic-based compatibility engine for validated PC designs, build commissions, and a marketplace for pre-built PCs.
+A React-based frontend for **Build Me a PC**, a platform connecting PC enthusiasts with verified builders. Features real-time PC part compatibility checks, build customization, and a marketplace for pre-built systems.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-- [Environment Variables](#environment-variables)
-- [Database](#database)
-- [Authentication](#authentication)
-- [User Roles & Permissions](#user-roles--permissions)
-- [API Endpoints](#api-endpoints)
-  - [Auth](#auth)
-  - [Users](#users)
-  - [Parts](#parts)
-  - [Categories](#categories)
-  - [Builds](#builds)
-  - [Build Requests](#build-requests)
-  - [Builder Offers](#builder-offers)
-  - [Showcase Inquiries](#showcase-inquiries)
-  - [Builder Applications](#builder-applications)
-  - [Compatibility](#compatibility)
-  - [Stats & Health](#stats--health)
-- [Compatibility Engine](#compatibility-engine)
-- [Database Schema](#database-schema)
 - [Project Structure](#project-structure)
-- [Error Handling](#error-handling)
-- [Contributors](#contributors)
+- [Features](#features)
+- [User Roles & Permissions](#user-roles--permissions)
+- [Key Pages](#key-pages)
+- [Contexts & State Management](#contexts--state-management)
+- [API Integration](#api-integration)
+- [Styling](#styling)
+- [Environment Configuration](#environment-configuration)
+- [Available Scripts](#available-scripts)
+- [Contributing](#contributing)
+
 ---
 
 ## Overview
 
-**Build Me a PC** is a platform where:
+**Build Me a PC** is a community-driven platform where:
 
-- **Users** can browse pre-built PCs, create custom builds with real-time compatibility checks, post build requests for builders, and interact with builds via comments, likes, and ratings.
-- **Builders** are verified experts who can post showcase pre-built PCs, respond to build requests with offers, and manage their builder profiles. Users can apply to become builders.
-- **Admins** can manage PC parts, review builder applications, moderate users (ban/unban), manage compatibility rules, and perform all builder/user actions.
+- **Users** can browse pre-built PCs, create custom builds with real-time compatibility validation, post build requests, and interact with builds through comments, likes, and ratings.
+- **Builders** (verified experts) can post showcase pre-built PCs, respond to build requests with offers, and manage their professional profiles.
+- **Admins** manage the entire platform: PC parts catalog, user moderation, builder applications review, and compatibility rules configuration.
+
+The frontend provides an intuitive UI for all these features, integrating seamlessly with a RESTful backend API.
 
 ---
 
 ## Tech Stack
 
-| Layer          | Technology                                    |
-| -------------- | --------------------------------------------- |
-| Runtime        | **Node.js** (ES Modules)                      |
-| Framework      | **Express.js** v4                             |
-| Database       | **PostgreSQL** (via `pg`)                     |
-| Authentication | **JWT** (`jsonwebtoken`) + **bcrypt**         |
-| CORS           | **cors**                                      |
-| Environment    | **dotenv**                                    |
-| Dev Tools      | **nodemon**                                   |
+| Category | Technology |
+| --- | --- |
+| **Runtime** | Node.js |
+| **Framework** | React 19 |
+| **Router** | React Router v7 |
+| **HTTP Client** | Axios |
+| **Build Tool** | Vite |
+| **Styling** | CSS3 (Custom, no CSS framework) |
+| **Linter** | ESLint |
+| **Package Manager** | pnpm |
+
+### Key Dependencies
+
+- `react@^19.2.0` — UI framework with React Hooks
+- `react-router-dom@^7.13.0` — Client-side routing
+- `axios@^1.13.5` — HTTP client with JWT interceptors
+- `vite@^7.2.4` — Lightning-fast dev server and build tool
 
 ---
 
@@ -58,348 +58,542 @@ A RESTful backend API for **Build Me a PC**, a platform connecting PC enthusiast
 
 ### Prerequisites
 
-- Node.js (v18+)
-- PostgreSQL database
+- **Node.js** v18+
+- **pnpm** (or npm/yarn)
+- **Backend API** running at `http://localhost:3000/api` (dev) or production URL
 
 ### Installation
 
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd dbs-db
+cd build-me-a-pc-site
 
 # Install dependencies
-npm install
+pnpm install
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your database URL and JWT secret
-
-# Start the development server
-npm run dev
+# Start development server
+pnpm run dev
 ```
 
-### Scripts
+The app will be available at `http://localhost:5173` (Vite default).
 
-| Command          | Description                                         |
-| ---------------- | --------------------------------------------------- |
-| `npm start`      | Start the production server                         |
-| `npm run dev`    | Start with nodemon (auto-reload on file changes)    |
-| `npm run db:init`| Seed the database with schema and sample data       |
-| `npm run db:reset`| Reset and re-seed the database                     |
+### Build for Production
 
-> **Note:** The server auto-initializes the database on first startup if tables don't exist.
-
----
-
-## Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/buildmeapc
-JWT_SECRET=your_jwt_secret_here
-PORT=3000
-NODE_ENV=development
+```bash
+pnpm run build
+pnpm run preview  # Preview the production build locally
 ```
-
----
-
-## Database
-
-The API uses **PostgreSQL** with the `pg` library. Connection pooling is configured via `config/db.js`.
-
-### Auto-Initialization
-
-On server startup, the app checks if the `users` table exists. If not, it automatically runs the schema and seeds the database with sample data including:
-
-- **5 users** — 1 admin, 2 regular users, 2 builders
-- **35 PC parts** across 8 categories (CPU, GPU, Motherboard, RAM, Storage, PSU, Case, Cooling)
-- **3 sample builds** — 2 personal builds, 1 builder showcase
-- **12 compatibility rules** covering socket matching, form factor checks, wattage calculations, etc.
-- Sample ratings, comments, and likes
-
-### Default Seed Accounts
-
-| Email                    | Password      | Role    |
-| ------------------------ | ------------- | ------- |
-| `admin@buildboard.com`  | `admin123`    | Admin   |
-| `alice@example.com`     | `password123` | User    |
-| `bob@example.com`       | `password123` | User    |
-| `techpro@example.com`   | `password123` | Builder |
-| `elite@example.com`     | `password123` | Builder |
-
----
-
-## Authentication
-
-Authentication uses **JWT Bearer tokens**. Tokens are issued on login/register and expire after **7 days**.
-
-Include the token in the `Authorization` header:
-
-```
-Authorization: Bearer <token>
-```
-
-### Middleware
-
-| Middleware       | Description                                                        |
-| ---------------- | ------------------------------------------------------------------ |
-| `authenticate`   | Requires a valid JWT; attaches `req.user` with `id`, `email`, `role` |
-| `optionalAuth`   | Attaches user if token present, otherwise sets `req.user = null`   |
-| `requireRole(...)` | Checks user role; admins inherit builder permissions             |
-
----
-
-## User Roles & Permissions
-
-| Action                           | User | Builder | Admin |
-| -------------------------------- | :--: | :-----: | :---: |
-| Register & sign in               |  ✅  |   ✅    |  ✅   |
-| Browse pre-built PCs             |  ✅  |   ✅    |  ✅   |
-| Create custom builds             |  ✅  |   ✅    |  ✅   |
-| Comment, like & rate builds      |  ✅  |   ✅    |  ✅   |
-| Post a build request             |  ✅  |   ✅    |  ✅   |
-| Browse active build requests     |  ✅  |   ✅    |  ✅   |
-| Respond to offers from builders  |  ✅  |   ✅    |  ✅   |
-| Apply to become a builder        |  ✅  |   ✅    |  ✅   |
-| Send showcase inquiries          |  ✅  |   ✅    |  ✅   |
-| Reply to build requests with offer |    |   ✅    |  ✅   |
-| Post showcase pre-built PCs      |    |   ✅    |  ✅   |
-| Add / edit / remove PC parts     |    |         |  ✅   |
-| Review builder applications      |    |         |  ✅   |
-| Manage compatibility rules       |    |         |  ✅   |
-| Moderate users (ban/unban)       |    |         |  ✅   |
-| Change user roles                |    |         |  ✅   |
-| View all users                   |    |         |  ✅   |
-
----
-
-## API Endpoints
-
-Base URL: `/api`
-
-### Auth
-
-| Method | Endpoint        | Auth     | Description                            |
-| ------ | --------------- | -------- | -------------------------------------- |
-| POST   | `/auth/register`| —        | Register a new user                    |
-| POST   | `/auth/login`   | —        | Login and receive JWT token            |
-| GET    | `/auth/me`      | Required | Get current authenticated user profile |
-
-### Users
-
-| Method | Endpoint                      | Auth     | Description                        |
-| ------ | ----------------------------- | -------- | ---------------------------------- |
-| GET    | `/users`                      | Admin    | List all users                     |
-| GET    | `/users/builders`             | —        | List all builders                  |
-| GET    | `/users/:id`                  | —        | Get user by ID                     |
-| PUT    | `/users/:id`                  | Owner/Admin | Update user profile             |
-| PUT    | `/users/:id/ban`              | Admin    | Ban or unban a user                |
-| PUT    | `/users/:id/role`             | Admin    | Change a user's role               |
-| GET    | `/users/:id/builder-profile`  | —        | Get builder profile                |
-| PUT    | `/users/:id/builder-profile`  | Owner/Admin | Update builder profile          |
-
-### Parts
-
-| Method | Endpoint      | Auth  | Description                              |
-| ------ | ------------- | ----- | ---------------------------------------- |
-| GET    | `/parts`      | —     | List active parts (filter by `category_id`) |
-| GET    | `/parts/all`  | Admin | List all parts (including inactive)      |
-| GET    | `/parts/:id`  | —     | Get part by ID                           |
-| POST   | `/parts`      | Admin | Create a new part                        |
-| PUT    | `/parts/:id`  | Admin | Update a part                            |
-| DELETE | `/parts/:id`  | Admin | Delete a part                            |
-
-### Categories
-
-| Method | Endpoint      | Auth | Description                |
-| ------ | ------------- | ---- | -------------------------- |
-| GET    | `/categories` | —    | List all part categories   |
-
-**Part Categories:** CPU, GPU, Motherboard, RAM, Storage, PSU, Case, Cooling
-
-### Builds
-
-| Method | Endpoint                    | Auth     | Description                              |
-| ------ | --------------------------- | -------- | ---------------------------------------- |
-| GET    | `/builds`                   | —        | List builds (filter by `status`, `build_type`, `creator_id`) |
-| GET    | `/builds/:id`               | —        | Get build by ID                          |
-| GET    | `/builds/:id/parts`         | —        | Get all parts in a build (nested `part` & `category` objects) |
-| POST   | `/builds`                   | Required | Create a build with compatibility check (returns `{ build, warnings }`) |
-| PUT    | `/builds/:id`               | Owner/Admin | Update a build (re-runs compatibility, returns `{ build, warnings }`) |
-| DELETE | `/builds/:id`               | Owner/Admin | Delete a build                        |
-| GET    | `/builds/:id/ratings`       | —        | Get all ratings for a build              |
-| GET    | `/builds/:id/ratings/mine`  | Required | Get your rating for a build              |
-| POST   | `/builds/:id/ratings`       | Required | Rate a build (1–5 score, updates `rating_avg`/`rating_count`) |
-| GET    | `/builds/:id/comments`      | —        | Get all comments on a build              |
-| POST   | `/builds/:id/comments`      | Required | Add a comment (supports threaded replies, returns `creator_display_name`) |
-| GET    | `/builds/:id/likes`         | —        | Get all likes on a build                 |
-| GET    | `/builds/:id/likes/check`   | Required | Check if you liked a build               |
-| POST   | `/builds/:id/likes/toggle`  | Required | Toggle like on a build (updates `like_count`) |
-
-> **Build Types:** `personal` (user-created) | `showcase` (builder pre-built)  
-> **Build Statuses:** `draft` | `published`
-
-### Build Requests
-
-| Method | Endpoint         | Auth     | Description                                   |
-| ------ | ---------------- | -------- | --------------------------------------------- |
-| GET    | `/requests`      | —        | List requests (filter by `status`, `user_id`, `build_id`) |
-| GET    | `/requests/:id`  | —        | Get request by ID                             |
-| POST   | `/requests`      | Required | Create a build request (with `budget`, `purpose`, `notes`, `preferred_builder_id`) |
-| PUT    | `/requests/:id`  | Owner/Admin | Update a build request                     |
-
-> **Request Statuses:** `open` → `claimed` → `in_progress` → `completed` | `cancelled`
-
-### Builder Offers
-
-| Method | Endpoint               | Auth    | Description                                |
-| ------ | ---------------------- | ------- | ------------------------------------------ |
-| GET    | `/offers`              | Required | List offers with builder profile data (filter by `request_id`, `builder_id`) |
-| POST   | `/offers`              | Builder | Submit an offer (`fee`, `message`, `contact_info`, optional `suggested_build_id`) |
-| POST   | `/offers/:id/accept`   | Request Owner/Admin | Accept an offer (auto-rejects others, sets request to `claimed`) |
-
-> **Offer Statuses:** `pending` → `accepted` | `rejected`
-
-### Showcase Inquiries
-
-| Method | Endpoint      | Auth     | Description                                    |
-| ------ | ------------- | -------- | ---------------------------------------------- |
-| GET    | `/inquiries`  | Required | List inquiries (filter by `build_id`, `builder_id`, `user_id`) |
-| POST   | `/inquiries`  | Required | Send an inquiry about a showcase build         |
-
-### Builder Applications
-
-| Method | Endpoint                    | Auth     | Description                              |
-| ------ | --------------------------- | -------- | ---------------------------------------- |
-| GET    | `/applications`             | Admin    | List all applications (filter by `status`, `user_id`) |
-| GET    | `/applications/mine`        | Required | Get your own applications                |
-| POST   | `/applications`             | Required | Submit a builder application             |
-| PUT    | `/applications/:id/review`  | Admin    | Approve or reject (sets `reviewed_at` timestamp) |
-
-> On approval, the user's role is upgraded to `builder` and a builder profile is created automatically (skipped if one already exists).
-
-### Compatibility
-
-| Method | Endpoint                | Auth  | Description                           |
-| ------ | ----------------------- | ----- | ------------------------------------- |
-| POST   | `/compatibility/check`  | —     | Run compatibility check on a parts map|
-| GET    | `/compatibility/rules`  | Admin | List all compatibility rules          |
-| PUT    | `/compatibility/rules/:id` | Admin | Update a compatibility rule        |
-
-### Stats & Health
-
-| Method | Endpoint       | Auth | Description                              |
-| ------ | -------------- | ---- | ---------------------------------------- |
-| GET    | `/health`      | —    | Health check (`{ status: 'ok' }`)        |
-| GET    | `/stats`       | —    | Platform stats (builds, parts, users, requests counts) |
-
----
-
-## Compatibility Engine
-
-The platform includes a **rule-based PC part compatibility engine** that validates builds in real-time. When creating or updating a build, parts are checked against active compatibility rules. **Errors** block the build from being saved, while **warnings** are returned alongside the build.
-
-### Rule Types
-
-| Rule Type                 | Description                                              | Example                                     |
-| ------------------------- | -------------------------------------------------------- | ------------------------------------------- |
-| `field_match`             | Two parts must share the same value for a given field    | CPU socket must match motherboard socket     |
-| `field_lte`              | Part A's field must be ≤ Part B's field                  | RAM modules ≤ motherboard RAM slots          |
-| `array_contains`          | Part A's value must exist in Part B's array              | Motherboard form factor in case's supported list |
-| `array_contains_formatted`| Same as above, but formats the value before checking     | AIO radiator size in case's radiator support |
-| `sum_gte`                | Target part's field must be ≥ sum of other fields × multiplier | PSU wattage ≥ (CPU TDP + GPU TDP) × 1.2  |
-| `pair_mismatch`           | Detects specific problematic value pairings              | ATX PSU in ITX case                          |
-
-### Built-in Rules (12 rules)
-
-1. **CPU-Motherboard Socket Match** — error
-2. **RAM-Motherboard Type Match** — error
-3. **RAM Modules vs Motherboard Slots** — error
-4. **RAM Capacity vs Motherboard Max** — error
-5. **Motherboard Form Factor vs Case** — error
-6. **GPU Length vs Case Max** — error
-7. **Cooler Socket Compatibility** — error
-8. **Air Cooler Height vs Case Max** — error
-9. **AIO Radiator vs Case Support** — error
-10. **PSU Wattage vs Total TDP** — warning
-11. **PSU-Case Form Factor** — warning
-12. **M.2 Storage vs Motherboard Slots** — error
-
-Rules are stored in the database and can be toggled, updated, or extended by admins via the API.
-
----
-
-## Database Schema
-
-The schema uses `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` for clean resets, then creates all types and 14 tables with UUID primary keys:
-
-![ERD](placeholder-image.png)
-
-### Enum Types
-
-| Enum                 | Values                                                 |
-| -------------------- | ------------------------------------------------------ |
-| `user_role`          | `user`, `builder`, `admin`                             |
-| `build_status`       | `draft`, `published`                                   |
-| `build_type`         | `personal`, `showcase`                                 |
-| `availability_status`| `available`, `sold_out`, `discontinued`                |
-| `request_status`     | `open`, `claimed`, `in_progress`, `completed`, `cancelled` |
-| `offer_status`       | `pending`, `accepted`, `rejected`                      |
-| `application_status` | `pending`, `approved`, `rejected`                      |
-| `application_type`   | `business`, `individual`                               |
-| `inquiry_status`     | `pending`, `responded`, `closed`                       |
 
 ---
 
 ## Project Structure
 
 ```
-dbs-db/
-├── server.js                  # Express app entry point, route mounting, startup
-├── package.json               # Dependencies and scripts
-├── config/
-│   └── db.js                  # PostgreSQL connection pool
-├── db/
-│   ├── init.js                # Auto-initialization on startup
-│   ├── schema.sql             # Full database schema (14 tables, triggers)
-│   ├── seed.js                # Standalone seed script
-│   └── seed.sql               # Seed data (users, parts, builds, rules)
-├── middleware/
-│   ├── auth.js                # JWT authentication & role-based authorization
-│   └── errorHandler.js        # Global error handler (PostgreSQL error codes)
-├── routes/
-│   ├── auth.js                # Register, login, current user
-│   ├── users.js               # User profiles, banning, role management
-│   ├── parts.js               # CRUD for PC parts (admin-managed)
-│   ├── categories.js          # Part categories listing
-│   ├── builds.js              # Builds CRUD, ratings, comments, likes
-│   ├── requests.js            # Build requests from users
-│   ├── offers.js              # Builder offers on requests
-│   ├── inquiries.js           # Showcase build inquiries
-│   ├── applications.js        # Builder application submission & review
-│   └── compatibility.js       # Compatibility check & rule management
-└── utils/
-    └── compatibility.js       # Rule evaluation engine (6 rule types)
+src/
+├── api/
+│   └── axios.js                 # HTTP client with JWT interceptors
+├── assets/
+│   └── react.svg
+├── components/
+│   └── layout/
+│       ├── Footer.jsx           # App footer
+│       ├── Layout.jsx           # Main layout wrapper
+│       ├── Navbar.jsx           # Navigation bar with auth links
+│       └── ProtectedRoute.jsx   # Route protection (auth & role-based)
+├── contexts/
+│   ├── AuthContext.jsx          # Authentication state (login, register, user)
+│   └── DataContext.jsx          # Data operations (CRUD for all resources)
+├── pages/
+│   ├── HomePage.jsx             # Home landing page
+│   ├── admin/                   # Admin-only pages
+│   │   ├── AdminApplicationsPage.jsx   # Review builder applications
+│   │   ├── AdminDashboardPage.jsx      # Admin overview & stats
+│   │   ├── AdminPartEditPage.jsx       # Edit PC parts
+│   │   ├── AdminPartNewPage.jsx        # Add new PC part
+│   │   ├── AdminPartsPage.jsx          # Parts catalog management
+│   │   ├── AdminRulesPage.jsx          # Compatibility rules config
+│   │   └── AdminUsersPage.jsx          # User management & banning
+│   ├── auth/
+│   │   ├── LoginPage.jsx        # User login
+│   │   └── RegisterPage.jsx     # User registration
+│   ├── builder/
+│   │   ├── BuilderApplyPage.jsx # Apply to become a builder
+│   │   └── BuilderDashboardPage.jsx # Builder's workspace
+│   ├── builds/
+│   │   ├── BuildCreatePage.jsx  # Create a new custom build
+│   │   ├── BuildDetailPage.jsx  # View build details & interact
+│   │   ├── BuildEditPage.jsx    # Edit existing build
+│   │   └── BuildsPage.jsx       # Browse all builds
+│   ├── profile/
+│   │   ├── ProfileEditPage.jsx  # Edit user/builder profile
+│   │   └── ProfilePage.jsx      # View user profile
+│   ├── requests/
+│   │   ├── RequestDetailPage.jsx    # View build request details
+│   │   └── RequestsPage.jsx         # Browse build requests
+│   └── showcase/
+│       ├── ShowcaseDetailPage.jsx   # View showcase build
+│       └── ShowcasePage.jsx         # Browse builder showcase
+├── utils/
+│   ├── compatibility.js         # PC part compatibility validation
+│   └── helpers.js               # Utility functions (currency, dates, etc.)
+├── App.jsx                      # Route definitions
+├── App.css                      # App-specific styles
+├── index.css                    # Global styles & design tokens
+├── main.jsx                     # React entry point
+└── index.html                   # HTML template
+
+public/
+├── _redirects                   # Netlify redirect rules for SPA
+└── vite.svg
 ```
 
 ---
 
-## Error Handling
+## Features
 
-The global error handler catches all errors and returns consistent JSON responses:
+### Authentication
 
-| Scenario                 | Status | Response                              |
-| ------------------------ | ------ | ------------------------------------- |
-| Authentication required  | 401    | `{ error: "Authentication required" }`|
-| Invalid/expired token    | 401    | `{ error: "Invalid or expired token" }`|
-| Insufficient permissions | 403    | `{ error: "Insufficient permissions" }`|
-| Banned account login     | 403    | `{ error: "This account has been banned" }` |
-| Resource not found       | 404    | `{ error: "<Resource> not found" }`   |
-| Duplicate resource       | 409    | `{ error: "Resource already exists" }`|
-| FK constraint violation  | 400    | `{ error: "Referenced resource not found" }`|
-| Internal error           | 500    | `{ error: "Internal server error" }`  |
+- **Register** with email & password (auto-login on success)
+- **Login** with JWT token (7-day expiration)
+- **Protected routes** with role-based access control (User, Builder, Admin)
+- **Auto-logout** on token expiration with redirect to login
+- **Persistent login** via localStorage
+
+### PC Build System
+
+- **Create custom builds** with real-time part selection
+- **Drag-and-drop or dropdown** part selection from 8 categories:
+    - CPU, GPU, Motherboard, RAM, Storage, PSU, Case, Cooling
+- **Real-time compatibility checking** (12 validation rules):
+    - CPU socket ↔ motherboard socket matching
+    - RAM type & capacity validation
+    - GPU length vs case constraints
+    - Cooler socket compatibility
+    - PSU wattage adequacy (with warnings)
+    - And 7 more rules...
+- **Visual build summary** with part images and total price
+- **Save as draft** or **publish** a build
+- **Edit** existing builds with re-validation
+
+### Social Features
+
+- **Rate builds** (1–5 stars with optional written review)
+- **Comment on builds** (threaded replies supported)
+- **Like builds** (toggle like status)
+- **View creator info** (profile link, builder status)
+
+### Build Requests & Offers
+
+- **Post a build request** with budget, purpose, and notes
+- **Browse active requests** from other users
+- **Builders respond with offers** including fees and contact info
+- **Users accept/reject offers** from builders
+- **Request status tracking** (open → claimed → in_progress → completed)
+
+### Showcase Pre-builts
+
+- **Builders post showcase builds** (verified, pre-built systems)
+- **Browse showcase catalog** with filters
+- **Send inquiries** about showcase builds
+- **Check availability status** (available, sold out, discontinued)
+
+### User Profiles
+
+- **Public profiles** with bio and avatar
+- **Builder profiles** with:
+    - Business name, specialization, website
+    - Portfolio URL and address
+    - Professional credentials
+- **Profile editing** for authenticated users
+
+### Builder Applications
+
+- **Apply to become a builder** with application form
+- **Submit portfolio & experience** (years of experience, specialization)
+- **Admins review applications** with approval/rejection
+- **Auto-upgrade to builder role** on approval
+
+### Admin Panel
+
+- **Parts management**: Create, edit, deactivate PC parts
+- **Parts specifications**: Dynamic form fields based on part category
+- **User management**: Ban/unban users, change roles
+- **Builder applications**: Review pending applications
+- **Compatibility rules**: Enable/disable/modify validation rules
+- **Dashboard**: Platform stats (users, builds, parts, pending apps)
+
+---
+
+## User Roles & Permissions
+
+| Action | User | Builder | Admin |
+| --- | :---: | :---: | :---: |
+| Register & login | ✅ | ✅ | ✅ |
+| Browse pre-built PCs | ✅ | ✅ | ✅ |
+| Create custom builds | ✅ | ✅ | ✅ |
+| Comment, like & rate | ✅ | ✅ | ✅ |
+| Post build request | ✅ | ✅ | ✅ |
+| Browse requests | ✅ | ✅ | ✅ |
+| Respond to requests (offers) | — | ✅ | ✅ |
+| Post showcase pre-builts | — | ✅ | ✅ |
+| Apply to become builder | ✅ | ✅ | ✅ |
+| Manage PC parts | — | — | ✅ |
+| Review applications | — | — | ✅ |
+| Modify compatibility rules | — | — | ✅ |
+| Ban/unban users | — | — | ✅ |
+| Change user roles | — | — | ✅ |
+
+---
+
+## Key Pages
+
+### Public Pages
+
+| Page | Route | Description |
+| --- | --- | --- |
+| Home | `/` | Landing page with platform overview |
+| Login | `/login` | Email/password login form |
+| Register | `/register` | New user registration |
+| Builds | `/builds` | Browse all personal & builder builds |
+| Build Detail | `/builds/:id` | View build specs, comments, ratings |
+| Requests | `/requests` | Browse active build requests |
+| Request Detail | `/requests/:id` | View request + builder offers |
+| Showcase | `/showcase` | Browse builder pre-built systems |
+| Showcase Detail | `/showcase/:id` | View showcase build details |
+| Profile | `/profile/:id` | View user/builder profile |
+
+### Authenticated Pages
+
+| Page | Route | Role | Description |
+| --- | --- | --- | --- |
+| Create Build | `/builds/new` | Any | Create custom build with parts |
+| Edit Build | `/builds/:id/edit` | Owner/Admin | Modify existing build |
+| Edit Profile | `/profile/edit` | Any | Update profile information |
+| Apply Builder | `/builder/apply` | User | Submit builder application |
+
+### Builder Pages
+
+| Page | Route | Description |
+| --- | --- | --- |
+| Builder Dashboard | `/builder/dashboard` | Manage offers, requests, showcase builds |
+
+### Admin Pages
+
+| Page | Route | Description |
+| --- | --- | --- |
+| Admin Dashboard | `/admin/dashboard` | Platform stats & quick links |
+| Parts | `/admin/parts` | Browse, search, filter parts |
+| Add Part | `/admin/parts/new` | Create new PC part with specs |
+| Edit Part | `/admin/parts/:id/edit` | Modify part details & specifications |
+| Users | `/admin/users` | List, search, ban/unban, change roles |
+| Applications | `/admin/applications` | Review pending builder applications |
+| Rules | `/admin/rules` | Manage compatibility validation rules |
+
+---
+
+## Contexts & State Management
+
+### `AuthContext.jsx`
+
+Manages authentication state and user session.
+
+**State:**
+- `user` — Current authenticated user object (or null)
+- `loading` — Initial auth check in progress
+- `isAuthenticated` — Boolean flag
+- `isBuilder` — True if user role is builder/admin
+- `isAdmin` — True if user role is admin
+
+**Methods:**
+- `login(email, password)` — Login user
+- `logout()` — Clear token and user
+- `register(email, password, displayName)` — Create new account
+- `refreshUser()` — Fetch updated user profile
+
+**Usage:**
+```javascript
+const { user, isAuthenticated, login, logout } = useAuth();
+```
+
+### `DataContext.jsx`
+
+Provides all data operations (CRUD) for platform resources.
+
+**Collections:**
+- `parts` — PC components
+- `builds` — User & builder builds
+- `build_requests` — User build requests
+- `builder_offers` — Builder responses to requests
+- `users` — User profiles
+- `builder_profiles` — Extended builder info
+- `applications` — Builder applications
+- `showcase_inquiries` — Inquiries about showcase builds
+
+**Generic Methods:**
+- `getAll(collection)` — Fetch all items
+- `getItemById(collection, id)` — Fetch single item
+- `createItem(collection, data)` — Create item
+- `editItem(collection, id, updates)` — Update item
+- `removeItem(collection, id)` — Delete item
+
+**Specialized Methods:**
+- `getParts(categoryId)` — Parts by category
+- `getBuilds(filters)` — Builds with filters
+- `saveBuild(data, parts)` — Create/update build with compatibility check
+- `addRating(buildId, data)` — Rate a build
+- `addComment(buildId, data)` — Comment on build
+- `toggleLike(buildId)` — Like/unlike a build
+- `checkCompatibility(partsMap)` — Validate parts
+- And many more...
+
+**Usage:**
+```javascript
+const { getBuilds, saveBuild, addRating } = useData();
+```
+
+---
+
+## API Integration
+
+### Axios Client (`api/axios.js`)
+
+- **Base URL**: Switches between dev (`http://localhost:3000/api`) and production
+- **JWT Interceptor**: Automatically attaches token to all requests
+- **401 Handler**: Auto-logout on expired/invalid token
+- **Error Handling**: Consistent error responses
+
+### Request/Response Flow
+
+1. **Request** — Token attached via interceptor
+2. **Response** — Data returned, errors caught
+3. **401 Errors** — Token cleared, redirect to login
+4. **Network Errors** — Propagated to component
+
+### Error Handling Pattern
+
+```javascript
+try {
+  const data = await someDataMethod();
+  setState(data);
+} catch (err) {
+  setError(err.response?.data?.error || err.message);
+}
+```
+
+---
+
+## Styling
+
+### Design System
+
+Global styles defined in `index.css` using CSS custom properties:
+
+**Color Palette:**
+```css
+--color-primary: #0891b2     /* Cyan */
+--color-secondary: #f97316   /* Orange */
+--color-success: #16a34a     /* Green */
+--color-danger: #dc2626      /* Red */
+--color-warning: #d97706     /* Amber */
+```
+
+**Spacing & Sizing:**
+- Border radius: `--radius-sm` (4px) to `--radius-full` (9999px)
+- Shadows: `--shadow-sm`, `--shadow-md`, `--shadow-lg`
+- Max width: `--max-width: 1200px`
+- Navbar height: `--navbar-height: 64px`
+
+### Component Classes
+
+**Buttons:**
+- `.btn` — Base styles
+- `.btn--primary` — Cyan primary button
+- `.btn--secondary` — Orange action button
+- `.btn--success`, `.btn--danger`, `.btn--warning` — Status buttons
+- `.btn--outline`, `.btn--ghost` — Alternative styles
+- `.btn--small`, `.btn--large`, `.btn--block` — Size variants
+
+**Cards:**
+- `.card` — Base container
+- `.card--hover` — Hover effect
+- `.card__header`, `.card__body`, `.card__footer` — Sections
+
+**Forms:**
+- `.form-group` — Input wrapper
+- `.form-input`, `.form-select`, `.form-textarea` — Input fields
+- `.form-label`, `.form-hint`, `.form-error` — Text helpers
+
+**Layouts:**
+- `.grid`, `.grid--2`, `.grid--3`, `.grid--4` — Grid systems
+- `.flex`, `.flex--between`, `.flex--center` — Flex utilities
+- `.page`, `.page__header` — Page containers
+- `.layout`, `.layout__main` — App layout
+
+**Badges & Alerts:**
+- `.badge`, `.badge--primary`, `.badge--success` — Status badges
+- `.alert`, `.alert--error`, `.alert--success` — Alert messages
+
+### Responsive Design
+
+Mobile-first approach with breakpoint at `768px`:
+- Stacked layouts on mobile
+- Grid adjustments for smaller screens
+- Touch-friendly button sizes
+
+### Animated Background
+
+Subtle floating shapes in the background:
+- 6 animated SVG circles/blobs
+- Smooth translate and rotation animations
+- 15–28 second duration for organic feel
+
+---
+
+## Environment Configuration
+
+### Development (`vite.config.js`)
+
+```javascript
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3000',  // Proxy to backend
+    },
+  },
+})
+```
+
+### Production Deployment
+
+The `public/_redirects` file ensures SPA routing works on Netlify:
+```
+/*    /index.html   200
+```
+
+### Backend URL
+
+Toggle in `src/api/axios.js`:
+```javascript
+const USE_PROD_API = true;  // Switch to use production or dev
+const PROD_API_BASE_URL = 'https://dbs-db.onrender.com/api';
+```
+
+---
+
+## Available Scripts
+
+| Command | Description |
+| --- | --- |
+| `pnpm run dev` | Start dev server with HMR (Vite) |
+| `pnpm run build` | Build for production |
+| `pnpm run preview` | Preview production build locally |
+| `pnpm run lint` | Run ESLint |
+
+---
+
+## Compatibility Checking
+
+The `utils/compatibility.js` module provides client-side validation (12 rules):
+
+```javascript
+checkCompatibility(selectedParts)  // Returns array of issues
+// Issues: { rule, severity ('error'|'warning'), message }
+```
+
+**Rules Implemented:**
+1. CPU socket ↔ motherboard socket
+2. RAM type ↔ motherboard RAM type
+3. RAM modules ≤ motherboard slots
+4. RAM capacity ≤ motherboard max
+5. Motherboard form factor ∈ case support
+6. GPU length ≤ case max GPU length
+7. Cooler socket ∈ CPU socket support
+8. Air cooler height ≤ case max height
+9. AIO radiator size ∈ case radiator support
+10. PSU wattage ≥ (CPU TDP + GPU TDP) × 1.2 (warning)
+11. PSU-case form factor compatibility (warning)
+12. M.2 storage slots ≤ motherboard M.2 slots
+
+Issues are displayed to users before build submission.
+
+---
+
+## Contributing
+
+### Development Workflow
+
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Make changes following the project structure
+3. Test locally: `pnpm run dev`
+4. Lint: `pnpm run lint`
+5. Commit & push
+6. Open PR for code review
+
+### Code Style
+
+- **ESLint rules** enforced (see `eslint.config.js`)
+- **React Hooks** preferred over class components
+- **Functional components** throughout the project
+- **Context API** for state management (no Redux)
+
+### Naming Conventions
+
+- **Pages:** PascalCase, suffix with "Page" (`BuildDetailPage.jsx`)
+- **Components:** PascalCase (`Navbar.jsx`, `ProtectedRoute.jsx`)
+- **Utilities:** camelCase (`checkCompatibility`, `formatCurrency`)
+- **CSS Classes:** kebab-case (`.page__header`, `.btn--primary`)
+
+---
+
+## Performance Considerations
+
+- **Lazy loading** of routes via React Router
+- **Conditional rendering** to minimize DOM nodes
+- **Axios caching** with interceptors
+- **Image optimization** (use `object-fit: contain` for product images)
+- **Sticky positioning** for sidebar (build summaries)
+
+---
+
+## Browser Support
+
+- Modern browsers (Chrome, Firefox, Safari, Edge)
+- ES2020+ JavaScript support required
+- CSS Grid & Flexbox
+- localStorage for token persistence
+
+---
+
+## Troubleshooting
+
+### Login redirects to login repeatedly
+
+- Check if `bb_token` in localStorage is valid
+- Clear localStorage: `localStorage.clear()`
+- Verify backend is running at the API URL
+
+### Parts not loading in build form
+
+- Ensure backend has seeded parts data
+- Check network tab for API errors (Status 500/403)
+- Verify user is authenticated
+
+### Compatibility check always fails
+
+- Confirm backend compatibility rules are active
+- Check selected parts have all required specifications
+- Review console for detailed validation errors
+
+---
+
+## Additional Resources
+
+- **Backend API Docs**: See `BACKEND_README_for_reference.md`
+- **React Docs**: https://react.dev
+- **Vite Docs**: https://vite.dev
+- **React Router Docs**: https://reactrouter.com
 
 ---
 
@@ -416,4 +610,5 @@ This is a university project for **CSX3006 Database Systems** course, developed 
 | Ekaterina Kazakova     | 6720065    | [Kari-Nami](github.com/Kari-Nami)           |
 
 ---
+
 
