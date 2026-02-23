@@ -961,6 +961,10 @@ img { max-width: 100%; display: block; }
   min-width: 160px;
 }
 
+.form-input {
+  resize: none;
+}
+
 .filter-bar__sort {
   /*color: var(--color-bg);*/
   background: var(--color-bg);
