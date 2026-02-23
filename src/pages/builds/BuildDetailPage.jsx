@@ -329,7 +329,7 @@ export default function BuildDetailPage() {
 
           {/* Compatibility */}
           {compatIssues.length === 0 ? (
-              <div className="alert alert--success" style={{marginBottom: '2rem', marginTop: '1rem'}}>
+              <div className="alert alert--success" style={{marginBottom: '1rem', marginTop: '1rem'}}>
                 <p>All parts are compatible!</p>
               </div>
           ) : (
@@ -540,12 +540,34 @@ export default function BuildDetailPage() {
             ) : (
               <p className="comments-empty">No comments yet. Be the first to share your thoughts!</p>
             )}
+
+            {/* New comment form */}
+            {isAuthenticated && (
+                <form className="comment-form" onSubmit={handleSubmitComment}>
+                  <h3>Add a Comment</h3>
+                  <textarea
+                      className="form__textarea"
+                      placeholder="Share your thoughts on this build..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      rows={3}
+                  />
+                  <button type="submit" className="btn btn--primary" disabled={!newComment.trim()}>
+                    Post Comment
+                  </button>
+                </form>
+            )}
+            {!isAuthenticated && (
+                <p className="comments-login">
+                  <Link to="/login">Log in</Link> to leave a comment or rating.
+                </p>
+            )}
           </div>
         </div>
 
         {/* Sidebar */}
         <div className="build-detail__sidebar">
-          <div className="card">
+          <div className="card" style={{marginBottom: '2rem'}}>
             <div className="card__body">
               <h3 className="card__title">Build Info</h3>
               <dl className="info-list">
@@ -615,7 +637,7 @@ export default function BuildDetailPage() {
 
           {/* Request Form */}
           {showRequestForm && (
-            <div className="card">
+            <div className="card" style={{marginBottom: '2rem'}}>
               <div className="card__body">
                 <h3 className="card__title">Post Request</h3>
                 <form onSubmit={handleCreateRequest}>
