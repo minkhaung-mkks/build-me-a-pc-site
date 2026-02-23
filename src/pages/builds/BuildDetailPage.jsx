@@ -461,84 +461,84 @@ export default function BuildDetailPage() {
             <h2>Comments ({comments.length})</h2>
 
             {commentTree.length > 0 ? (
-              <div className="comments-list">
-                {commentTree.map(comment => (
-                  <div key={comment.id} className="comment">
-                    <div className="comment__header">
+                <div className="comments-list">
+                  {commentTree.map(comment => (
+                      <div key={comment.id} className="comment">
+                        <div className="comment__header">
                       <span className="comment__author">
                         {comment.creator_display_name || 'Unknown User'}
                       </span>
-                      <span className="comment__date">{timeAgo(comment.created_at)}</span>
-                    </div>
-                    <p className="comment__content">{comment.content}</p>
-                    {isAuthenticated && (
-                      <button
-                        className="comment__reply-btn"
-                        onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
-                      >
-                        {replyTo === comment.id ? 'Cancel' : 'Reply'}
-                      </button>
-                    )}
+                          <span className="comment__date">{timeAgo(comment.created_at)}</span>
+                        </div>
+                        <p className="comment__content">{comment.content}</p>
+                        {isAuthenticated && (
+                            <button
+                                className="comment__reply-btn"
+                                onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
+                            >
+                              {replyTo === comment.id ? 'Cancel' : 'Reply'}
+                            </button>
+                        )}
 
-                    {/* Reply form */}
-                    {replyTo === comment.id && (
-                      <form className="comment-form comment-form--reply" onSubmit={handleSubmitReply}>
+                        {/* Reply form */}
+                        {replyTo === comment.id && (
+                            <form className="form-group" onSubmit={handleSubmitReply}>
                         <textarea
-                          className="form__textarea"
-                          placeholder="Write a reply..."
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          rows={2}
+                            className="form-input"
+                            placeholder="Write a reply..."
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            rows={2}
                         />
-                        <button type="submit" className="btn btn--primary btn--sm" disabled={!replyText.trim()}>
-                          Post Reply
-                        </button>
-                      </form>
-                    )}
+                              <button type="submit" className="btn btn--primary btn--sm" disabled={!replyText.trim()}>
+                                Post Reply
+                              </button>
+                            </form>
+                        )}
 
-                    {/* Nested replies */}
-                    {comment.replies.length > 0 && (
-                      <div className="comment__replies">
-                        {comment.replies.map(reply => (
-                          <div key={reply.id} className="comment comment--reply">
-                            <div className="comment__header">
+                        {/* Nested replies */}
+                        {comment.replies.length > 0 && (
+                            <div className="comment__replies">
+                              {comment.replies.map(reply => (
+                                  <div key={reply.id} className="comment comment--reply">
+                                    <div className="comment__header">
                               <span className="comment__author">
                                 {reply.creator_display_name || 'Unknown User'}
                               </span>
-                              <span className="comment__date">{timeAgo(reply.created_at)}</span>
-                            </div>
-                            <p className="comment__content">{reply.content}</p>
-                            {isAuthenticated && (
-                              <button
-                                className="comment__reply-btn"
-                                onClick={() => setReplyTo(replyTo === reply.id ? null : reply.id)}
-                              >
-                                {replyTo === reply.id ? 'Cancel' : 'Reply'}
-                              </button>
-                            )}
-                            {replyTo === reply.id && (
-                              <form className="comment-form comment-form--reply" onSubmit={handleSubmitReply}>
+                                      <span className="comment__date">{timeAgo(reply.created_at)}</span>
+                                    </div>
+                                    <p className="comment__content">{reply.content}</p>
+                                    {isAuthenticated && (
+                                        <button
+                                            className="comment__reply-btn"
+                                            onClick={() => setReplyTo(replyTo === reply.id ? null : reply.id)}
+                                        >
+                                          {replyTo === reply.id ? 'Cancel' : 'Reply'}
+                                        </button>
+                                    )}
+                                    {replyTo === reply.id && (
+                                        <form className="form-group" onSubmit={handleSubmitReply}>
                                 <textarea
-                                  className="form__textarea"
-                                  placeholder="Write a reply..."
-                                  value={replyText}
-                                  onChange={(e) => setReplyText(e.target.value)}
-                                  rows={2}
+                                    className="form-input"
+                                    placeholder="Write a reply..."
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    rows={2}
                                 />
-                                <button type="submit" className="btn btn--primary btn--sm" disabled={!replyText.trim()}>
-                                  Post Reply
-                                </button>
-                              </form>
-                            )}
-                          </div>
-                        ))}
+                                          <button type="submit" className="btn btn--primary btn--sm" disabled={!replyText.trim()}>
+                                            Post Reply
+                                          </button>
+                                        </form>
+                                    )}
+                                  </div>
+                              ))}
+                            </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
             ) : (
-              <p className="comments-empty">No comments yet. Be the first to share your thoughts!</p>
+                <p className="comments-empty">No comments yet. Be the first to share your thoughts!</p>
             )}
 
             {/* New comment form */}
