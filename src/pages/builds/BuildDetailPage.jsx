@@ -416,7 +416,7 @@ export default function BuildDetailPage() {
             </div>
           )}
 
-          {/* Social Actions */}
+          {/* likes, avg rating */}
           <div className="social-actions card" style={{marginBottom: '2rem'}}>
             {isAuthenticated && (
               <button
@@ -478,41 +478,41 @@ export default function BuildDetailPage() {
           )}
 
           {/* Ratings List */}
-          {ratings.length === 0 ? (
-              <p className="text--muted">No ratings yet.</p>
-          ) : (
-              <div className="card" style={{marginBottom: '2rem'}}>
-              <div className="card__title">
-                <h2>Ratings ({ratings.length})</h2>
-              </div>
-              <div className="card__body">
-                <div className="rating-list">
-                  {ratings.map((rating) => (
-                      <div key={rating.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong>
-                            {rating.user_id ? (
-                                <Link to={`/profile/${rating.user_id}`}>
-                                  {rating.creator_display_name || 'Unknown User'}
-                                </Link>
-                            ) : (
-                                'Unknown User'
-                            )}
-                          </strong>
-                          <span>
-                          {'★'.repeat(rating.score)}{'☆'.repeat(5 - rating.score)}
-                        </span>
-                        </div>
-                        {rating.review_text && <p style={{ marginTop: '0.25rem' }}>{rating.review_text}</p>}
-                        <span className="text--muted" style={{ fontSize: '0.85rem' }}>
-                        {formatDate(rating.created_at)}
-                      </span>
-                      </div>
-                  ))}
-                </div>
-              </div>
+          <div className="card" style={{marginBottom: '2rem'}}>
+            <div className="card__title">
+              <h2>Ratings ({ratings.length})</h2>
             </div>
-          )}
+            {ratings.length === 0 ? (
+                <p className="text-muted">No ratings yet.</p>
+            ) : (
+                <div className="card__body">
+                  <div className="rating-list">
+                    {ratings.map((rating) => (
+                        <div key={rating.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong>
+                              {rating.user_id ? (
+                                  <Link to={`/profile/${rating.user_id}`}>
+                                    {rating.creator_display_name || 'Unknown User'}
+                                  </Link>
+                              ) : (
+                                  'Unknown User'
+                              )}
+                            </strong>
+                            <span>
+                      {'★'.repeat(rating.score)}{'☆'.repeat(5 - rating.score)}
+                    </span>
+                          </div>
+                          {rating.review_text && <p style={{ marginTop: '0.25rem' }}>{rating.review_text}</p>}
+                          <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                    {formatDate(rating.created_at)}
+                  </span>
+                        </div>
+                    ))}
+                  </div>
+                </div>
+            )}
+        </div>
 
           {/* Comments Section */}
           <div className="build-detail__comments card">
