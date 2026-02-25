@@ -195,8 +195,8 @@ export default function BuildDetailPage() {
         setActiveRequest(null);
       }
 
-      // Load inquiries for builder owners
-      if (user && user.id === b.creator_id && (user.role === 'builder' || user.role === 'admin')) {
+      // Load inquiries for builder owners of showcase builds
+      if (user && user.id === b.creator_id && b.build_type === 'showcase') {
         try {
           const inquiriesData = await getInquiries({ build_id: id });
           setInquiries(inquiriesData);
@@ -755,6 +755,59 @@ export default function BuildDetailPage() {
                     Submit Request
                   </button>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Inquiries for builder owner */}
+          {isOwner && inquiries.length > 0 && (
+            <div className="card" style={{marginBottom: '2rem'}}>
+              <div className="card__header">
+                <h3 className="card__title">Inquiries ({inquiries.length})</h3>
+              </div>
+              <div className="card__body">
+                {inquiries.map((inquiry) => (
+                  <div key={inquiry.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '0.75rem 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                      <strong style={{ fontSize: '0.9rem' }}>
+                        {inquiry.user_id ? (
+                          <Link to={`/profile/${inquiry.user_id}`}>{inquiry.user_display_name || 'Unknown'}</Link>
+                        ) : (
+                          'Unknown'
+                        )}
+                      </strong>
+                      <span className={`badge ${
+                        inquiry.status === 'accepted' ? 'badge--success' :
+                        inquiry.status === 'declined' ? 'badge--error' :
+                        'badge--warning'
+                      }`} style={{ fontSize: '0.75rem' }}>
+                        {inquiry.status}
+                      </span>
+                    </div>
+                    {inquiry.message && <p style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>{inquiry.message}</p>}
+                    <span className="text--muted" style={{ fontSize: '0.75rem' }}>
+                      {formatDate(inquiry.created_at)}
+                    </span>
+                    {inquiry.status === 'pending' && (
+                      <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="btn btn--primary btn--sm"
+                          onClick={() => handleInquiryStatus(inquiry.id, 'accepted')}
+                          disabled={processingInquiryId === inquiry.id}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="btn btn--secondary btn--sm"
+                          onClick={() => handleInquiryStatus(inquiry.id, 'declined')}
+                          disabled={processingInquiryId === inquiry.id}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

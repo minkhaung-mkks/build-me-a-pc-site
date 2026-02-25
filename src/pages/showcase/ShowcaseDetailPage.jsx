@@ -17,7 +17,7 @@ export default function ShowcaseDetailPage() {
   const {
     getItemById, getBuildParts, getBuilderProfile,
     getRatings, getUserRating, addRating, getComments, addComment,
-    isLiked, toggleLike, createInquiry,
+    isLiked, toggleLike, createInquiry, getInquiries, updateInquiry,
   } = useData();
   const { user, isAuthenticated } = useAuth();
 
@@ -31,6 +31,8 @@ export default function ShowcaseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [inquiries, setInquiries] = useState([]);
+  const [processingInquiryId, setProcessingInquiryId] = useState(null);
 
   // Inquiry form state
   const [inquiryMessage, setInquiryMessage] = useState('');
@@ -78,6 +80,16 @@ export default function ShowcaseDetailPage() {
       if (user) {
         setLiked(results[4]);
         setHasRated(!!results[5]);
+      }
+
+      // Load inquiries for builder owner
+      if (user && user.id === b.creator_id) {
+        try {
+          const inquiriesData = await getInquiries({ build_id: b.id });
+          setInquiries(inquiriesData);
+        } catch {
+          setInquiries([]);
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message);
@@ -186,6 +198,18 @@ export default function ShowcaseDetailPage() {
       setInquirySubmitted(true);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
+    }
+  };
+
+  const handleInquiryStatus = async (inquiryId, status) => {
+    setProcessingInquiryId(inquiryId);
+    try {
+      const updated = await updateInquiry(inquiryId, status);
+      setInquiries(prev => prev.map(i => i.id === inquiryId ? { ...i, status: updated.status } : i));
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setProcessingInquiryId(null);
     }
   };
 
@@ -429,6 +453,59 @@ export default function ShowcaseDetailPage() {
                     <button type="submit" className="btn btn--primary">Send Inquiry</button>
                   </form>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Inquiries management for builder owner */}
+          {isOwner && inquiries.length > 0 && (
+            <div className="card" style={{ marginBottom: '2rem' }}>
+              <div className="card__header">
+                <h2>Inquiries ({inquiries.length})</h2>
+              </div>
+              <div className="card__body">
+                {inquiries.map((inquiry) => (
+                  <div key={inquiry.id} style={{ borderBottom: '1px solid var(--color-border, #eee)', padding: '1rem 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <strong>
+                        {inquiry.user_id ? (
+                          <Link to={`/profile/${inquiry.user_id}`}>{inquiry.user_display_name || 'Unknown User'}</Link>
+                        ) : (
+                          'Unknown User'
+                        )}
+                      </strong>
+                      <span className={`badge ${
+                        inquiry.status === 'accepted' ? 'badge--success' :
+                        inquiry.status === 'declined' ? 'badge--error' :
+                        'badge--warning'
+                      }`}>
+                        {inquiry.status}
+                      </span>
+                    </div>
+                    {inquiry.message && <p style={{ marginBottom: '0.5rem' }}>{inquiry.message}</p>}
+                    <span className="text--muted" style={{ fontSize: '0.85rem' }}>
+                      {formatDate(inquiry.created_at)}
+                    </span>
+                    {inquiry.status === 'pending' && (
+                      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="btn btn--primary btn--sm"
+                          onClick={() => handleInquiryStatus(inquiry.id, 'accepted')}
+                          disabled={processingInquiryId === inquiry.id}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="btn btn--secondary btn--sm"
+                          onClick={() => handleInquiryStatus(inquiry.id, 'declined')}
+                          disabled={processingInquiryId === inquiry.id}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
