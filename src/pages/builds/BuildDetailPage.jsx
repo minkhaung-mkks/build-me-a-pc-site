@@ -105,7 +105,7 @@ export default function BuildDetailPage() {
     getItemById, getBuildParts, getRatings, getComments,
     isLiked, toggleLike, addRating, addComment, createItem,
     updateBuild, getBuilders, getRequests, getUserRating,
-    checkCompatibility, removeItem
+    checkCompatibility, removeItem, getInquiries, updateInquiry
   } = useData();
   const { user, isAuthenticated, isBuilder } = useAuth();
 
@@ -118,6 +118,9 @@ export default function BuildDetailPage() {
   const [compatIssues, setCompatIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [inquiries, setInquiries] = useState([]);
+  const [processingInquiryId, setProcessingInquiryId] = useState(null);
 
   // Rating form
   const [newScore, setNewScore] = useState(0);
@@ -192,6 +195,16 @@ export default function BuildDetailPage() {
         setActiveRequest(null);
       }
 
+      // Load inquiries for builder owners
+      if (user && user.id === b.creator_id && (user.role === 'builder' || user.role === 'admin')) {
+        try {
+          const inquiriesData = await getInquiries({ build_id: id });
+          setInquiries(inquiriesData);
+        } catch {
+          setInquiries([]);
+        }
+      }
+
       if (user) {
         const [likedStatus, userRating] = await Promise.all([
           isLiked(id),
@@ -205,7 +218,7 @@ export default function BuildDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, user, getItemById, getBuildParts, getRatings, getComments, isLiked, getBuilders, getRequests, getUserRating, checkCompatibility]);
+  }, [id, user, getItemById, getBuildParts, getRatings, getComments, isLiked, getBuilders, getRequests, getUserRating, checkCompatibility, getInquiries]);
 
   useEffect(() => {
     loadData();
@@ -289,6 +302,18 @@ export default function BuildDetailPage() {
     }
   }, [user, id, replyTo, replyText, addComment, getComments]);
 
+  const handleInquiryStatus = async (inquiryId, status) => {
+    setProcessingInquiryId(inquiryId);
+    try {
+      const updated = await updateInquiry(inquiryId, status);
+      setInquiries(prev => prev.map(i => i.id === inquiryId ? { ...i, status: updated.status } : i));
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setProcessingInquiryId(null);
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -344,7 +369,7 @@ export default function BuildDetailPage() {
             <div className="build-gallery" style={{marginBottom: '2rem'}}>
               <div className="build-gallery__main">
                 <img
-                  src={build.image_urls[0]}
+                  src={build.image_urls[selectedImageIndex]}
                   alt={build.title}
                   className="build-gallery__image"
                   style={{width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: 'var(--radius-lg, 8px)'}}
@@ -358,7 +383,8 @@ export default function BuildDetailPage() {
                       src={url}
                       alt={`${build.title} ${idx + 1}`}
                       className="build-gallery__thumb"
-                      style={{width: '80px', height: '60px', objectFit: 'cover', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer', opacity: idx === 0 ? 1 : 0.6}}
+                      onClick={() => setSelectedImageIndex(idx)}
+                      style={{width: '80px', height: '60px', objectFit: 'cover', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer', opacity: idx === selectedImageIndex ? 1 : 0.6, border: idx === selectedImageIndex ? '2px solid var(--color-primary)' : '2px solid transparent'}}
                     />
                   ))}
                 </div>

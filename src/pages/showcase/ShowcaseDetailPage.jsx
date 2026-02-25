@@ -30,6 +30,7 @@ export default function ShowcaseDetailPage() {
   const [likeCount, setLikeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   // Inquiry form state
   const [inquiryMessage, setInquiryMessage] = useState('');
@@ -333,7 +334,7 @@ export default function ShowcaseDetailPage() {
               <div className="card__body">
                 <div className="build-gallery__main">
                   <img
-                    src={build.image_urls[0]}
+                    src={build.image_urls[selectedImageIndex]}
                     alt={build.title}
                     className="build-gallery__image"
                     style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: 'var(--radius-lg, 8px)' }}
@@ -347,7 +348,8 @@ export default function ShowcaseDetailPage() {
                         src={url}
                         alt={`${build.title} ${idx + 1}`}
                         className="build-gallery__thumb"
-                        style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer', opacity: idx === 0 ? 1 : 0.6 }}
+                        onClick={() => setSelectedImageIndex(idx)}
+                        style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: 'var(--radius-sm, 4px)', cursor: 'pointer', opacity: idx === selectedImageIndex ? 1 : 0.6, border: idx === selectedImageIndex ? '2px solid var(--color-primary)' : '2px solid transparent' }}
                       />
                     ))}
                   </div>
