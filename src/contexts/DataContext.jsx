@@ -92,7 +92,7 @@ export function DataProvider({ children }) {
   }, []);
 
   const updateBuild = useCallback(async (buildId, updates) => {
-    const { data } = await api.put(`/builds/${buildId}`, updates);
+    const { data } = await api.patch(`/builds/${buildId}`, updates);
     return data.build || data;
   }, []);
 
